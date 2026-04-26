@@ -1,4 +1,3 @@
-cat > /workspace/retouch_ai/codeformer_loader.py << 'EOF'
 from __future__ import annotations
 import logging
 import os
@@ -41,7 +40,7 @@ def load_codeformer(weight_path: str = DEFAULT_WEIGHT_PATH, device=None) -> nn.M
         fix_modules=["quantize", "generator"],
     )
 
-    checkpoint = torch.load(str(weight_path), map_location="cpu", weights_only=False)
+    checkpoint = torch.load(str(weight_path), map_location="cpu")
     state_dict = (
         checkpoint.get("params_ema")
         or checkpoint.get("params")
@@ -49,7 +48,7 @@ def load_codeformer(weight_path: str = DEFAULT_WEIGHT_PATH, device=None) -> nn.M
     )
     state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
 
-    missing, unexpected = net.load_state_dict(state_dict, strict=True)
+    net.load_state_dict(state_dict, strict=True)
     net.eval().to(device)
     logger.info("CodeFormer loaded ✓  device=%s", device)
     return net
@@ -57,8 +56,8 @@ def load_codeformer(weight_path: str = DEFAULT_WEIGHT_PATH, device=None) -> nn.M
 
 def _download_weights(dest: Path) -> None:
     import urllib.request
+
     URL = "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
     dest.parent.mkdir(parents=True, exist_ok=True)
     logger.info("Downloading CodeFormer weights → %s", dest)
     urllib.request.urlretrieve(URL, str(dest))
-EOF
