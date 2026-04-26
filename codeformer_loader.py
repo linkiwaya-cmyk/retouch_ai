@@ -14,6 +14,7 @@ DEFAULT_WEIGHT_PATH = os.environ.get(
     str(Path.home() / ".cache/codeformer/codeformer.pth"),
 )
 
+# Добавляем CodeFormer в путь
 CF_REPO = os.environ.get("CODEFORMER_REPO", "/workspace/CodeFormer")
 if CF_REPO not in sys.path:
     sys.path.insert(0, CF_REPO)
@@ -27,6 +28,7 @@ def load_codeformer(weight_path: str = DEFAULT_WEIGHT_PATH, device=None) -> nn.M
     if not weight_path.exists():
         _download_weights(weight_path)
 
+    # Импорт из официального репозитория
     from basicsr.archs.codeformer_arch import CodeFormer
 
     net = CodeFormer(
@@ -40,12 +42,16 @@ def load_codeformer(weight_path: str = DEFAULT_WEIGHT_PATH, device=None) -> nn.M
     )
 
     checkpoint = torch.load(str(weight_path), map_location="cpu", weights_only=False)
-    state_dict = checkpoint.get("params_ema") or checkpoint.get("params") or checkpoint
+    state_dict = (
+        checkpoint.get("params_ema")
+        or checkpoint.get("params")
+        or checkpoint
+    )
     state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
 
-    net.load_state_dict(state_dict, strict=True)
+    missing, unexpected = net.load_state_dict(state_dict, strict=True)
     net.eval().to(device)
-    logger.info("CodeFormer loaded ✓ device=%s", device)
+    logger.info("CodeFormer loaded ✓  device=%s", device)
     return net
 
 
