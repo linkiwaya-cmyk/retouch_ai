@@ -1,15 +1,16 @@
-"""main.py v8"""
+"""main.py v9"""
 import io, logging, time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from pipeline import RetouchPipeline
+from pipeline import RetouchPipeline, TONE_STR, DB_STR, MICRO_STR
 from utils import decode_image, encode_image_to_bytes
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-_usage: dict[str, int] = {}
+_usage: dict[str,int] = {}
 MAX_PER_USER = 1000
 pipeline: RetouchPipeline | None = None
 
@@ -23,7 +24,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Retouch API v8", lifespan=lifespan)
+app = FastAPI(title="Retouch API v9", lifespan=lifespan)
 
 
 @app.post("/process-image")
@@ -40,63 +41,59 @@ async def process_image(
     if not raw:
         raise HTTPException(400, "Empty file.")
 
-    fname  = file.filename or "photo.jpg"
-    in_mb  = len(raw) / 1024 / 1024
-    t_all  = time.time()
+    fname = file.filename or "photo.jpg"
+    in_mb = len(raw)/1024/1024
+    tall  = time.time()
 
     t0 = time.time()
     try:
-        img_bgr, meta = decode_image(raw)
+        img, meta = decode_image(raw)
     except Exception as e:
         raise HTTPException(400, f"Cannot decode: {e}")
-    t_decode = time.time() - t0
+    t_dec = time.time()-t0
 
-    H, W = img_bgr.shape[:2]
-    logger.info("=" * 55)
-    logger.info("IN  file       : %s", fname)
-    logger.info("IN  format     : %s", meta.get("format","?"))
-    logger.info("IN  size       : %.2f MB", in_mb)
-    logger.info("IN  resolution : %dx%d", W, H)
-    logger.info("IN  orientation: applied=%s", meta.get("orientation_applied"))
-    logger.info("IN  decode     : %.2fs", t_decode)
+    H, W = img.shape[:2]
+    logger.info("="*55)
+    logger.info("IN  file      : %s", fname)
+    logger.info("IN  format    : %s", meta.get("format","?"))
+    logger.info("IN  size      : %.2f MB", in_mb)
+    logger.info("IN  resolution: %dx%d", W, H)
+    logger.info("IN  exif_ok   : %s", meta.get("orientation_applied"))
+    logger.info("IN  decode    : %.2fs", t_dec)
 
     try:
-        result, stats = pipeline.run(img_bgr)  # type: ignore
+        result, stats = pipeline.run(img)  # type: ignore
     except Exception as e:
         logger.exception("Pipeline error")
         raise HTTPException(500, f"Error: {e}")
 
     rH, rW = result.shape[:2]
-
     t0 = time.time()
-    out_bytes = encode_image_to_bytes(result, meta, quality=100)
-    t_enc = time.time() - t0
-    out_mb = len(out_bytes) / 1024 / 1024
-    t_total = time.time() - t_all
+    out = encode_image_to_bytes(result, meta, quality=100)
+    t_enc = time.time()-t0
+    out_mb = len(out)/1024/1024
+    ttotal = time.time()-tall
 
-    logger.info("OUT resolution : %dx%d%s", rW, rH,
-                " ⚠️ CHANGED" if (rW!=W or rH!=H) else " ✓")
-    logger.info("OUT size       : %.2f MB (in=%.2f MB)", out_mb, in_mb)
-    logger.info("TIME decode    : %.2fs", t_decode)
-    logger.info("TIME detect    : %.2fs", stats.get("t_detect",0))
-    logger.info("TIME retouch   : %.2fs", stats.get("t_retouch",0))
-    logger.info("TIME encode    : %.2fs", t_enc)
-    logger.info("TIME total     : %.2fs ← must be <60s", t_total)
-    logger.info("RETOUCH faces  : %d", stats.get("faces",0))
-    logger.info("RETOUCH redness: %.2f  level: %.2f  micro: %.2f",
-                stats.get("redness",0), stats.get("level",0), MICRO_STR if hasattr(pipeline,'_') else 0)
-    logger.info("=" * 55)
+    logger.info("OUT resolution: %dx%d%s", rW,rH, " ⚠️" if (rW!=W or rH!=H) else " ✓")
+    logger.info("OUT size      : %.2f MB (in=%.2f MB)", out_mb, in_mb)
+    logger.info("TIME decode   : %.2fs", t_dec)
+    logger.info("TIME detect   : %.2fs", stats.get("t_detect",0))
+    logger.info("TIME retouch  : %.2fs", stats.get("t_retouch",0))
+    logger.info("TIME encode   : %.2fs", t_enc)
+    logger.info("TIME TOTAL    : %.2fs", ttotal)
+    logger.info("FACES         : %d", stats.get("faces",0))
+    logger.info("PARAMS tone=%.2f db=%.2f micro=%.2f", TONE_STR, DB_STR, MICRO_STR)
+    logger.info("="*55)
 
-    stem = fname.rsplit(".", 1)[0]
+    stem = fname.rsplit(".",1)[0]
     out_name = f"retouched_{stem}.jpg"
 
     return StreamingResponse(
-        io.BytesIO(out_bytes),
+        io.BytesIO(out),
         media_type="image/jpeg",
         headers={
             "Content-Disposition": f'attachment; filename="{out_name}"',
-            "X-Total-Time": f"{t_total:.1f}s",
-            "X-Input-MB":   f"{in_mb:.2f}",
+            "X-Total-Time": f"{ttotal:.1f}s",
             "X-Output-MB":  f"{out_mb:.2f}",
             "X-Faces":      str(stats.get("faces",0)),
         },
@@ -105,13 +102,8 @@ async def process_image(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "ready": pipeline is not None}
-
+    return {"status":"ok","ready":pipeline is not None}
 
 @app.get("/usage/{uid}")
 async def usage(uid: str):
-    return {"used": _usage.get(uid, 0), "limit": MAX_PER_USER}
-
-
-# Экспортируем для логов
-from pipeline import MICRO_STR  # noqa
+    return {"used":_usage.get(uid,0),"limit":MAX_PER_USER}
