@@ -1,27 +1,45 @@
 """
-RetouchPipeline v3 — Professional Beauty Retouch
+RetouchPipeline v4 — Professional Beauty Retouch
 
-Принцип: ручная ретушь по логике фотографа.
-НЕ AI-перерисовывание. НЕ blur. НЕ пластик.
+ПОЛНОСТЬЮ ПЕРЕПИСАН. Никакого пластика, никакого blur.
 
-Этапы:
-  1. Face detection
-  2. Face parsing → skin mask (только кожа, без глаз/губ/волос/фона)
-  3. Blemish removal — удаление дефектов через inpainting
-  4. Skin tone evening — выравнивание пятен и покраснений (low-freq)
-  5. Dodge & Burn — профессиональный D&B по skin mask
-  6. Мягкое сглаживание (frequency separation, texture preserved)
-  7. CodeFormer — МИНИМАЛЬНО (fidelity=0.95, blend=0.10), только дефекты
-  8. Финальный composite
+Логика как у профессионального ретушёра в Photoshop:
 
-Настройки через .env:
-  RETOUCH_STRENGTH=medium   # light / medium / strong
-  CF_FIDELITY=0.95
-  CF_BLEND=0.10
+  1. Skin mask (BiSeNet) — только кожа, не трогаем:
+     глаза, брови, губы, волосы, фон
+
+  2. Blemish removal — ТОЧЕЧНЫЙ inpaint только дефектов
+     (не по всему лицу)
+
+  3. Frequency separation (правильная):
+     - low-freq  = Gaussian blur большого радиуса (ТОЛЬКО тон)
+     - high-freq = original - low (ТЕКСТУРА, поры — 100%)
+     - корректируем ТОЛЬКО low-freq
+     - high-freq возвращаем НЕТРОНУТЫМ
+
+  4. Skin tone / color evening
+     - выравниваем неровный тон ТОЛЬКО в low-freq
+     - работаем в Lab (только L и a каналы)
+     - не меняем цвет кожи глобально
+
+  5. Dodge & Burn (правильный)
+     - локальная работа светом в low-freq
+     - dodge: осветляем тёмные участки кожи
+     - burn: затемняем слишком светлые
+     - только по skin_mask
+     - рекомбинируем с оригинальной текстурой
+
+  6. CodeFormer — МИНИМАЛЬНО (fidelity=0.97, blend=0.05)
+     или полностью отключить через CODEFORMER_BLEND=0
+
+  7. Composite с feather — бесшовная вставка в оригинал
+
+Настройки в .env:
+  RETOUCH_STRENGTH=medium   # light/medium/strong
+  CODEFORMER_BLEND=0.05     # 0 = отключить CodeFormer
 """
 
 from __future__ import annotations
-
 import logging
 import os
 from pathlib import Path
@@ -32,42 +50,39 @@ import numpy as np
 import torch
 
 from codeformer_loader import load_codeformer
-from utils import blend_with_mask, feather_mask, dilate_mask, safe_crop
+from utils import (
+    blend_layers, feather_mask, dilate_mask, erode_mask, safe_crop
+)
 
 logger = logging.getLogger(__name__)
-
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-CF_WEIGHT = os.environ.get(
-    "CODEFORMER_WEIGHT",
-    str(Path.home() / ".cache/codeformer/codeformer.pth"),
-)
-PARSING_WEIGHT_DIR = os.environ.get(
-    "BISENET_WEIGHT_DIR",
-    str(Path.home() / ".cache/facexlib"),
-)
+CF_WEIGHT = os.environ.get("CODEFORMER_WEIGHT", str(Path.home() / ".cache/codeformer/codeformer.pth"))
+PARSING_DIR = os.environ.get("BISENET_WEIGHT_DIR", str(Path.home() / ".cache/facexlib"))
+FACE_CONF = float(os.environ.get("FACE_CONF", "0.5"))
 
-# ── Сила ретуши (RETOUCH_STRENGTH=light/medium/strong) ────────────────────────
-_STRENGTH_PRESETS = {
-    "light":  {"smooth": 0.30, "db": 0.12, "tone": 0.25, "cf_blend": 0.08},
-    "medium": {"smooth": 0.50, "db": 0.22, "tone": 0.45, "cf_blend": 0.12},
-    "strong": {"smooth": 0.70, "db": 0.35, "tone": 0.65, "cf_blend": 0.15},
+# Пресеты силы ретуши
+_PRESETS = {
+    #              blemish  smooth  db    tone  cf_blend
+    "light":      (0.80,   0.20,  0.10, 0.15,  0.03),
+    "medium":     (0.85,   0.30,  0.18, 0.25,  0.05),
+    "strong":     (0.88,   0.42,  0.28, 0.38,  0.05),
 }
+_pname = os.environ.get("RETOUCH_STRENGTH", "medium")
+_p = _PRESETS.get(_pname, _PRESETS["medium"])
 
-_preset_name = os.environ.get("RETOUCH_STRENGTH", "medium")
-_preset = _STRENGTH_PRESETS.get(_preset_name, _STRENGTH_PRESETS["medium"])
+BLEMISH_PERC   = float(os.environ.get("BLEMISH_PERCENTILE", _p[0]))
+SMOOTH_STR     = float(os.environ.get("SKIN_SMOOTH_STRENGTH", _p[1]))
+DB_STR         = float(os.environ.get("DB_STRENGTH", _p[2]))
+TONE_STR       = float(os.environ.get("TONE_STRENGTH", _p[3]))
+CF_BLEND       = float(os.environ.get("CODEFORMER_BLEND", _p[4]))
+CF_FIDELITY    = float(os.environ.get("CF_FIDELITY", "0.97"))
 
-SMOOTH_STRENGTH = float(os.environ.get("SKIN_SMOOTH_STRENGTH", _preset["smooth"]))
-DB_STRENGTH     = float(os.environ.get("DB_STRENGTH",          _preset["db"]))
-TONE_STRENGTH   = float(os.environ.get("TONE_STRENGTH",        _preset["tone"]))
-CF_FIDELITY     = float(os.environ.get("CF_FIDELITY",          "0.95"))
-CF_BLEND        = float(os.environ.get("CODEFORMER_BLEND",     _preset["cf_blend"]))
-FACE_CONF       = float(os.environ.get("FACE_CONF",            "0.5"))
-_CF_SIZE        = 512
+_CF_SIZE = 512
 
 # BiSeNet labels
-_SKIN_LABELS    = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13}
-_NON_SKIN       = {11, 12, 17, 18}  # глаза, губы
+_SKIN  = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13}
+_NOSKIN = {11, 12, 17, 18}  # глаза, губы — НЕ трогаем
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -78,50 +93,37 @@ class FaceDetector:
     def __init__(self):
         self._app = None
         self._retina = None
-        self._load()
+        self._init()
 
-    def _load(self):
+    def _init(self):
         try:
             from insightface.app import FaceAnalysis
-            app = FaceAnalysis(
-                name="buffalo_l",
-                providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
-            )
+            app = FaceAnalysis(name="buffalo_l",
+                               providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
             app.prepare(ctx_id=0 if torch.cuda.is_available() else -1, det_size=(640, 640))
             self._app = app
-            logger.info("FaceDetector: InsightFace buffalo_l")
-        except Exception as exc:
-            logger.warning("InsightFace unavailable (%s), trying RetinaFace", exc)
+            logger.info("FaceDetector: InsightFace")
+        except Exception as e:
+            logger.warning("InsightFace failed (%s), trying RetinaFace", e)
             try:
                 from facexlib.detection import init_detection_model
-                self._retina = init_detection_model(
-                    "retinaface_resnet50", half=False, device=str(DEVICE)
-                )
-                logger.info("FaceDetector: RetinaFace fallback")
-            except Exception as exc2:
-                logger.error("No face detector: %s", exc2)
+                self._retina = init_detection_model("retinaface_resnet50", half=False, device=str(DEVICE))
+                logger.info("FaceDetector: RetinaFace")
+            except Exception as e2:
+                logger.error("No face detector: %s", e2)
 
-    def detect(self, img_bgr: np.ndarray) -> list[dict]:
+    def detect(self, img: np.ndarray) -> list[dict]:
         if self._app:
-            return self._detect_insight(img_bgr)
-        if self._retina:
-            return self._detect_retina(img_bgr)
-        return []
-
-    def _detect_insight(self, img_bgr):
-        faces = self._app.get(img_bgr)
-        out = [
-            {"bbox": f.bbox.astype(int).tolist(), "score": float(f.det_score)}
-            for f in faces if f.det_score >= FACE_CONF
-        ]
-        out.sort(key=lambda d: (d["bbox"][2]-d["bbox"][0])*(d["bbox"][3]-d["bbox"][1]), reverse=True)
-        return out
-
-    def _detect_retina(self, img_bgr):
-        rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        with torch.no_grad():
-            boxes = self._retina.detect_faces(rgb, conf_threshold=FACE_CONF)
-        out = [{"bbox": [int(b[0]),int(b[1]),int(b[2]),int(b[3])], "score": float(b[4])} for b in boxes]
+            faces = self._app.get(img)
+            out = [{"bbox": f.bbox.astype(int).tolist(), "score": float(f.det_score)}
+                   for f in faces if f.det_score >= FACE_CONF]
+        elif self._retina:
+            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            with torch.no_grad():
+                boxes = self._retina.detect_faces(rgb, conf_threshold=FACE_CONF)
+            out = [{"bbox": [int(b[0]),int(b[1]),int(b[2]),int(b[3])], "score": float(b[4])} for b in boxes]
+        else:
+            return []
         out.sort(key=lambda d: (d["bbox"][2]-d["bbox"][0])*(d["bbox"][3]-d["bbox"][1]), reverse=True)
         return out
 
@@ -133,275 +135,298 @@ class FaceDetector:
 class FaceParser:
     def __init__(self):
         self._net = None
-        self._load()
+        self._init()
 
-    def _load(self):
+    def _init(self):
         try:
             from facexlib.parsing import init_parsing_model
-            self._net = init_parsing_model(
-                model_name="bisenet", device=str(DEVICE),
-                model_rootpath=PARSING_WEIGHT_DIR,
-            )
+            self._net = init_parsing_model(model_name="bisenet", device=str(DEVICE),
+                                           model_rootpath=PARSING_DIR)
             self._net.eval()
-            logger.info("FaceParser: BiSeNet loaded")
-        except Exception as exc:
-            logger.warning("BiSeNet unavailable (%s). HSV fallback.", exc)
+            logger.info("FaceParser: BiSeNet OK")
+        except Exception as e:
+            logger.warning("BiSeNet failed: %s — HSV fallback", e)
 
-    def get_skin_mask(self, face_bgr: np.ndarray) -> np.ndarray:
-        if self._net is not None:
-            return self._bisenet(face_bgr)
-        return self._hsv(face_bgr)
+    def skin_mask(self, face_bgr: np.ndarray) -> np.ndarray:
+        """float32 [0..1], HxW. 1=кожа, 0=не кожа."""
+        return self._bisenet(face_bgr) if self._net else self._hsv(face_bgr)
 
-    def _bisenet(self, face_bgr: np.ndarray) -> np.ndarray:
-        h, w = face_bgr.shape[:2]
-        inp = cv2.resize(face_bgr, (512, 512))
-        inp = cv2.cvtColor(inp, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
-        inp = (inp - np.array([0.485,0.456,0.406])) / np.array([0.229,0.224,0.225])
-        t = torch.from_numpy(inp.transpose(2,0,1)).unsqueeze(0).float().to(DEVICE)
+    def _bisenet(self, face: np.ndarray) -> np.ndarray:
+        H, W = face.shape[:2]
+        x = cv2.resize(face, (512, 512))
+        x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        x = (x - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
+        t = torch.from_numpy(x.transpose(2, 0, 1)).unsqueeze(0).float().to(DEVICE)
         with torch.no_grad():
-            out = self._net(t)[0]
-        seg = out.squeeze(0).argmax(0).cpu().numpy().astype(np.uint8)
-        mask = np.zeros((512,512), np.uint8)
-        for lbl in _SKIN_LABELS:
+            seg = self._net(t)[0].squeeze(0).argmax(0).cpu().numpy().astype(np.uint8)
+        mask = np.zeros((512, 512), np.uint8)
+        for lbl in _SKIN:
             mask[seg == lbl] = 255
-        for lbl in _NON_SKIN:
-            mask[seg == lbl] = 0
-        mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
-        return mask.astype(np.float32) / 255.0
+        for lbl in _NOSKIN:
+            mask[seg == lbl] = 0  # убираем глаза/губы
+        return (cv2.resize(mask, (W, H), cv2.INTER_NEAREST).astype(np.float32) / 255.0)
 
-    def _hsv(self, face_bgr: np.ndarray) -> np.ndarray:
-        hsv = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, np.array([0,20,70]), np.array([20,170,255]))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
-        return mask.astype(np.float32) / 255.0
+    def _hsv(self, face: np.ndarray) -> np.ndarray:
+        hsv = cv2.cvtColor(face, cv2.COLOR_BGR2HSV)
+        m = cv2.inRange(hsv, np.array([0, 15, 60]), np.array([25, 170, 255]))
+        return (cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((5,5),np.uint8)).astype(np.float32)/255.0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 1: Blemish Removal (inpainting дефектов)
+# CORE: Правильная Frequency Separation
 # ══════════════════════════════════════════════════════════════════════════════
 
-def remove_blemishes(face_bgr: np.ndarray, skin_mask: np.ndarray) -> np.ndarray:
+def frequency_separate(img: np.ndarray, radius: int) -> tuple[np.ndarray, np.ndarray]:
     """
-    Детектирует локальные дефекты (прыщи, пятна) и убирает их через inpainting.
-    Работает только в пределах skin_mask.
+    Разделяет изображение на:
+    - low_freq:  тон, цвет (Gaussian blur)
+    - high_freq: текстура, поры (img - low_freq)
+
+    high_freq содержит ОТРИЦАТЕЛЬНЫЕ значения — это нормально.
+    При рекомбинации: result = new_low + high_freq
     """
-    lab = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2Lab)
+    k = radius * 2 + 1
+    low = cv2.GaussianBlur(img.astype(np.float32), (k, k), radius / 2.0)
+    high = img.astype(np.float32) - low
+    return low, high
+
+
+def recombine(low: np.ndarray, high: np.ndarray) -> np.ndarray:
+    return np.clip(low + high, 0, 255).astype(np.uint8)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 1: Точечное удаление дефектов (inpaint)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def remove_blemishes(face: np.ndarray, skin: np.ndarray, percentile: float = BLEMISH_PERC) -> np.ndarray:
+    """
+    Детектирует локальные аномалии яркости → inpaint.
+    ТОЛЬКО точечные дефекты — не по всему лицу.
+    """
+    H, W = face.shape[:2]
+    # Адаптивный радиус под разрешение
+    r = max(25, int(min(H, W) * 0.05))
+    if r % 2 == 0: r += 1
+
+    lab = cv2.cvtColor(face, cv2.COLOR_BGR2Lab)
     L = lab[:,:,0].astype(np.float32)
 
-    h, w = face_bgr.shape[:2]
-    # Адаптивный радиус под разрешение
-    k = max(21, int(min(h, w) * 0.04))
-    if k % 2 == 0: k += 1
-
-    local_mean = cv2.GaussianBlur(L, (k, k), 0)
+    local_mean = cv2.GaussianBlur(L, (r, r), 0)
     diff = np.abs(L - local_mean)
 
-    # Порог для детекции дефектов
-    thresh = np.percentile(diff[skin_mask > 0.3], 82) if skin_mask.sum() > 100 else 18.0
-    blemish_mask = ((diff > thresh) & (skin_mask > 0.3)).astype(np.uint8) * 255
+    skin_pixels = diff[skin > 0.4]
+    if len(skin_pixels) < 50:
+        return face
 
-    # Морфология — убираем шум, расширяем дефекты
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
-    blemish_mask = cv2.morphologyEx(blemish_mask, cv2.MORPH_OPEN, kernel)
-    blemish_mask = cv2.dilate(blemish_mask, kernel, iterations=2)
+    thresh = np.percentile(skin_pixels, percentile * 100)
+    thresh = max(thresh, 8.0)  # минимальный порог
 
-    if blemish_mask.sum() == 0:
-        return face_bgr
+    blemish = ((diff > thresh) & (skin > 0.4)).astype(np.uint8) * 255
 
-    # Inpainting — заполняем дефекты соседними пикселями
-    result = cv2.inpaint(face_bgr, blemish_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
-    logger.info("Blemish removal: %d pixels inpainted", int(blemish_mask.sum()/255))
+    # Морфология — убираем шум
+    k3 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    k5 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    blemish = cv2.morphologyEx(blemish, cv2.MORPH_OPEN, k3)   # убираем точечный шум
+    blemish = cv2.dilate(blemish, k5, iterations=1)             # расширяем края дефектов
+
+    n_pixels = int(blemish.sum() / 255)
+    if n_pixels == 0:
+        return face
+
+    # Ограничиваем — не более 8% площади лица (иначе это не дефект, а особенность)
+    max_pixels = int(H * W * 0.08)
+    if n_pixels > max_pixels:
+        logger.info("Blemish mask too large (%d px), skipping inpaint", n_pixels)
+        return face
+
+    result = cv2.inpaint(face, blemish, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
+    logger.info("Blemish inpaint: %d pixels", n_pixels)
     return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 2: Skin Tone Evening (выравнивание пятен/покраснений)
+# STEP 2: Выравнивание тона кожи (только low-freq, только кожа)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def even_skin_tone(
-    face_bgr: np.ndarray,
-    skin_mask: np.ndarray,
-    strength: float = TONE_STRENGTH,
-) -> np.ndarray:
+def even_skin_tone(face: np.ndarray, skin: np.ndarray, strength: float = TONE_STR) -> np.ndarray:
     """
-    Выравнивает неровный тон кожи (покраснения, пятна).
-    Работает в пространстве Lab — не меняет цвет, только выравнивает L и a.
-    Текстура (high-freq) сохраняется полностью.
+    Выравнивает неровный тон (покраснения, пятна) через low-freq коррекцию.
+    Работает в Lab. Текстура (high-freq) сохраняется полностью.
     """
-    lab = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2Lab).astype(np.float32)
-    h, w = face_bgr.shape[:2]
+    if strength < 0.01:
+        return face
 
-    k = max(31, int(min(h, w) * 0.07))
-    if k % 2 == 0: k += 1
+    H, W = face.shape[:2]
+    r_low = max(35, int(min(H, W) * 0.08))
+    if r_low % 2 == 0: r_low += 1
 
-    result_lab = lab.copy()
+    lab = cv2.cvtColor(face, cv2.COLOR_BGR2Lab).astype(np.float32)
 
-    for ch in [0, 1]:  # L (яркость) и a (красный-зелёный)
-        channel = lab[:,:,ch]
-        # Low-freq = локальный средний тон
-        low_freq = cv2.GaussianBlur(channel, (k, k), 0)
-        # Global mean на коже
-        skin_pixels = channel[skin_mask > 0.5]
-        if len(skin_pixels) == 0:
-            continue
-        global_mean = float(skin_pixels.mean())
-        # Целевой low-freq = сглаженный в сторону глобального среднего
-        target_low = low_freq * (1 - strength) + global_mean * strength
-        # Применяем только на коже
-        corrected = channel.copy()
-        m = skin_mask
-        corrected = channel + (target_low - low_freq) * m * strength
-        result_lab[:,:,ch] = np.clip(corrected, 0, 255)
+    # Разделяем L и a на low+high
+    L_low, L_high = frequency_separate(lab[:,:,0], r_low)
+    a_low, a_high = frequency_separate(lab[:,:,1], r_low)
 
-    result = cv2.cvtColor(result_lab.astype(np.uint8), cv2.COLOR_Lab2BGR)
+    # Глобальное среднее по коже
+    m = skin > 0.5
+    if m.sum() < 100:
+        return face
+
+    L_mean = float(L_low[m].mean())
+    a_mean = float(a_low[m].mean())
+
+    # Сдвигаем low-freq к среднему значению — только на коже
+    L_low_new = L_low.copy()
+    a_low_new = a_low.copy()
+    L_low_new[m] = L_low[m] + (L_mean - L_low[m]) * strength
+    a_low_new[m] = a_low[m] + (a_mean - a_low[m]) * strength * 0.6  # чуть слабее по цвету
+
+    # Рекомбинируем с оригинальной текстурой
+    lab[:,:,0] = np.clip(L_low_new + L_high, 0, 255)
+    lab[:,:,1] = np.clip(a_low_new + a_high, 0, 255)
+
+    result = cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_Lab2BGR)
     return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 3: Dodge & Burn (профессиональный D&B)
+# STEP 3: Профессиональный Dodge & Burn
 # ══════════════════════════════════════════════════════════════════════════════
 
-def dodge_and_burn(
-    face_bgr: np.ndarray,
-    skin_mask: np.ndarray,
-    strength: float = DB_STRENGTH,
-) -> np.ndarray:
+def dodge_and_burn(face: np.ndarray, skin: np.ndarray, strength: float = DB_STR) -> np.ndarray:
     """
-    Профессиональный Dodge & Burn:
-    - Работает в L канале (Lab) — не меняет цвет
-    - Low-frequency D&B: выравнивает крупные зоны света/тени
-    - High-frequency D&B: убирает мелкие неровности тона
-    - Применяется только на skin_mask
-    - Текстура кожи (поры) сохраняется полностью
+    Правильный Dodge & Burn:
+    - Разделяем на low-freq и high-freq
+    - Dodge & Burn применяем ТОЛЬКО к low-freq (тону)
+    - high-freq (текстура, поры) возвращаем НЕТРОНУТОЙ 100%
+    - Работает только по skin mask
+    - Не трогает глаза, брови, губы
     """
-    lab = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2Lab).astype(np.float32)
+    if strength < 0.01:
+        return face
+
+    H, W = face.shape[:2]
+
+    # Радиус для low-freq — крупные зоны света/тени
+    r_low = max(41, int(min(H, W) * 0.10))
+    if r_low % 2 == 0: r_low += 1
+
+    # Радиус для mid-freq — средние неровности
+    r_mid = max(15, int(min(H, W) * 0.035))
+    if r_mid % 2 == 0: r_mid += 1
+
+    lab = cv2.cvtColor(face, cv2.COLOR_BGR2Lab).astype(np.float32)
     L = lab[:,:,0]
-    h, w = face_bgr.shape[:2]
 
-    # ── Low-frequency D&B (крупные зоны) ──────────────────────────────────
-    k_low = max(51, int(min(h, w) * 0.12))
-    if k_low % 2 == 0: k_low += 1
-    L_low = cv2.GaussianBlur(L, (k_low, k_low), 0)
+    # ── Разделяем на low и high ────────────────────────────────────────────
+    L_low, L_high = frequency_separate(L, r_low)
 
-    # Разница между локальной яркостью и средней по коже
-    skin_L = L[skin_mask > 0.5]
-    if len(skin_L) == 0:
-        return face_bgr
-    mean_L = float(skin_L.mean())
+    # ── Dodge & Burn на low-freq ───────────────────────────────────────────
+    m = skin > 0.3
+    if m.sum() < 100:
+        return face
 
-    # Корректируем: тёмные участки -> dodge, светлые -> burn
-    low_correction = (mean_L - L_low) * skin_mask * strength * 0.6
-    L_corrected = L + low_correction
+    L_mean = float(L_low[m].mean())
 
-    # ── High-frequency D&B (мелкие неровности тона) ───────────────────────
-    k_high = max(11, int(min(h, w) * 0.025))
-    if k_high % 2 == 0: k_high += 1
-    L_high_blur = cv2.GaussianBlur(L_corrected, (k_high, k_high), 0)
-    L_high_freq = L_corrected - L_high_blur  # текстура
+    # Карта коррекции: тёмные участки -> dodge (+), светлые -> burn (-)
+    correction = (L_mean - L_low) * strength
 
-    # Unsharp mask на mid-frequencies (не на мелкой текстуре)
-    k_mid = max(21, int(min(h, w) * 0.05))
-    if k_mid % 2 == 0: k_mid += 1
-    L_mid = cv2.GaussianBlur(L_corrected, (k_mid, k_mid), 0)
-    L_mid_detail = L_corrected - L_mid
-    L_corrected = L_corrected + L_mid_detail * skin_mask * strength * 0.4
+    # Применяем только на коже, с мягким feather
+    skin_f = feather_mask(skin, radius=max(8, int(min(H, W) * 0.015)))
+    L_low_corrected = L_low + correction * skin_f
 
-    # ── Рекомбинируем ──────────────────────────────────────────────────────
-    # Возвращаем high-freq текстуру нетронутой
-    L_final = L_corrected - cv2.GaussianBlur(L_corrected, (k_high, k_high), 0) * 0
-    L_final = np.clip(L_corrected, 0, 255)
+    # ── Mid-freq Dodge & Burn (более мелкие неровности) ───────────────────
+    L_mid, L_mid_high = frequency_separate(L, r_mid)
+    L_mid_mean = float(L_mid[m].mean())
+    mid_correction = (L_mid_mean - L_mid) * strength * 0.4
+    L_mid_corrected = L_mid + mid_correction * skin_f
+    # mid high-freq
+    L_mid_high_new = L - L_mid_corrected  # обновляем mid high
+    # Возвращаем только коррекцию mid-freq
+    L_combined_low = L_low_corrected + (L_mid_corrected - L_mid)
 
-    lab[:,:,0] = L_final
+    # ── Рекомбинируем: low_corrected + high_original ───────────────────────
+    # HIGH-FREQ (текстура) НЕТРОНУТА
+    L_result = np.clip(L_combined_low + L_high, 0, 255)
+
+    lab[:,:,0] = L_result
+    result = cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_Lab2BGR)
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 4: Мягкое сглаживание цвета кожи (не яркости, не текстуры)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def smooth_skin_color(face: np.ndarray, skin: np.ndarray, strength: float = SMOOTH_STR) -> np.ndarray:
+    """
+    Очень мягкое сглаживание ТОЛЬКО цветового неравенства кожи.
+    НЕ размывает текстуру — работает только с low-freq a и b каналами (Lab).
+    L канал (яркость/текстура) не трогаем.
+    """
+    if strength < 0.01:
+        return face
+
+    H, W = face.shape[:2]
+    r = max(25, int(min(H, W) * 0.06))
+    if r % 2 == 0: r += 1
+
+    lab = cv2.cvtColor(face, cv2.COLOR_BGR2Lab).astype(np.float32)
+
+    # Работаем только с a и b (цвет), НЕ с L (яркость/текстура)
+    for ch in [1, 2]:
+        ch_data = lab[:,:,ch]
+        ch_low, ch_high = frequency_separate(ch_data, r)
+        # Bilateral сглаживание low-freq цвета
+        ch_low_u8 = np.clip(ch_low, 0, 255).astype(np.uint8)
+        ch_smooth = cv2.bilateralFilter(ch_low_u8, d=r//2*2+1,
+                                        sigmaColor=20, sigmaSpace=20).astype(np.float32)
+        # Применяем только на коже
+        skin_f = feather_mask(skin, radius=max(6, r//4))
+        ch_low_new = ch_low * (1 - skin_f * strength) + ch_smooth * (skin_f * strength)
+        # Рекомбинируем с оригинальной текстурой цвета
+        lab[:,:,ch] = np.clip(ch_low_new + ch_high, 0, 255)
+
     return cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_Lab2BGR)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 4: Frequency Separation Smooth (текстура сохранена)
+# STEP 5: CodeFormer — минимально (fidelity=0.97, blend=0.05)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def frequency_separation_smooth(
-    face_bgr: np.ndarray,
-    skin_mask: np.ndarray,
-    strength: float = SMOOTH_STRENGTH,
-) -> np.ndarray:
-    """
-    Frequency separation:
-    - Bilateral filter → low-freq (тон, цвет)
-    - оригинал - low = high-freq (текстура, поры)
-    - Сглаживаем ТОЛЬКО low-freq внутри skin_mask
-    - High-freq добавляем обратно 100% → текстура кожи сохранена
-    """
-    img = face_bgr.astype(np.float32)
-    h, w = face_bgr.shape[:2]
-
-    # Адаптивный радиус
-    d = max(9, int(min(h, w) * 0.012))
-    if d % 2 == 0: d += 1
-
-    # Bilateral — сохраняет края, убирает мелкие неровности цвета
-    low_freq = cv2.bilateralFilter(
-        face_bgr, d=d*2+1, sigmaColor=45, sigmaSpace=45
-    ).astype(np.float32)
-
-    # Текстура = оригинал минус low-freq
-    high_freq = img - low_freq
-
-    # Дополнительно сглаживаем low-freq Гауссом внутри маски
-    k = max(5, d)
-    if k % 2 == 0: k += 1
-    smoother = cv2.GaussianBlur(low_freq, (k, k), 0)
-
-    m = skin_mask[..., np.newaxis]
-    low_out = low_freq * (1.0 - m * strength) + smoother * (m * strength)
-
-    # Рекомбинируем: возвращаем текстуру полностью
-    result = low_out + high_freq
-    return np.clip(result, 0, 255).astype(np.uint8)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 5: CodeFormer — минимально, только дефекты
-# ══════════════════════════════════════════════════════════════════════════════
-
-def run_codeformer_minimal(
-    face_bgr: np.ndarray,
-    net: torch.nn.Module,
-    skin_mask: np.ndarray,
+def apply_codeformer(
+    face: np.ndarray,
+    net,
+    skin: np.ndarray,
     fidelity: float = CF_FIDELITY,
     blend: float = CF_BLEND,
 ) -> tuple[np.ndarray, bool]:
-    """
-    CodeFormer с fidelity=0.95 и blend=0.10.
-    Результат смешивается ТОЛЬКО на участках кожи.
-    Возвращает (result, applied: bool).
-    """
-    if blend < 0.01:
-        return face_bgr, False
+    if net is None or blend < 0.01:
+        return face, False
 
-    h, w = face_bgr.shape[:2]
-    face_512 = cv2.resize(face_bgr, (_CF_SIZE, _CF_SIZE), interpolation=cv2.INTER_LANCZOS4)
-    inp = cv2.cvtColor(face_512, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
-    inp = (inp - 0.5) / 0.5
-    tensor = torch.from_numpy(inp.transpose(2,0,1)).unsqueeze(0).to(DEVICE)
+    H, W = face.shape[:2]
+    inp = cv2.resize(face, (_CF_SIZE, _CF_SIZE), cv2.INTER_LANCZOS4)
+    inp_t = torch.from_numpy(
+        (cv2.cvtColor(inp, cv2.COLOR_BGR2RGB).astype(np.float32)/255.0 - 0.5) / 0.5
+    ).permute(2,0,1).unsqueeze(0).to(DEVICE)
 
     try:
         with torch.no_grad():
-            output = net(tensor, w=fidelity, adain=True)
-            if isinstance(output, (list, tuple)):
-                output = output[0]
-    except Exception as exc:
-        logger.warning("CodeFormer inference failed: %s", exc)
-        return face_bgr, False
+            out = net(inp_t, w=fidelity, adain=True)
+            if isinstance(out, (list, tuple)):
+                out = out[0]
+    except Exception as e:
+        logger.warning("CodeFormer inference failed: %s", e)
+        return face, False
 
-    out_np = output.squeeze(0).permute(1,2,0).cpu().numpy()
-    out_np = np.clip(out_np * 0.5 + 0.5, 0, 1)
-    cf_bgr = cv2.cvtColor((out_np * 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
-    cf_bgr = cv2.resize(cf_bgr, (w, h), interpolation=cv2.INTER_LANCZOS4)
+    out_np = np.clip(out.squeeze(0).permute(1,2,0).cpu().numpy() * 0.5 + 0.5, 0, 1)
+    cf = cv2.cvtColor((out_np*255).astype(np.uint8), cv2.COLOR_RGB2BGR)
+    cf = cv2.resize(cf, (W, H), cv2.INTER_LANCZOS4)
 
     # Смешиваем только на коже, очень мягко
-    skin_feathered = feather_mask(skin_mask, radius=10)
-    final_mask = skin_feathered * blend
-    result = blend_with_mask(cf_bgr, face_bgr, final_mask)
+    alpha = feather_mask(skin, radius=12) * blend
+    result = blend_layers(cf, face, alpha)
+    logger.info("CodeFormer applied: fidelity=%.2f blend=%.2f", fidelity, blend)
     return result, True
 
 
@@ -409,11 +434,11 @@ def run_codeformer_minimal(
 # Face helpers
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _pad_bbox(bbox: list, img_h: int, img_w: int, pad: float = 0.35) -> list:
-    x1, y1, x2, y2 = bbox
-    bw, bh = x2-x1, y2-y1
-    px, py = int(bw*pad), int(bh*pad)
-    return [max(0,x1-px), max(0,y1-py), min(img_w,x2+px), min(img_h,y2+py)]
+def _pad_bbox(bbox, H, W, pad=0.35):
+    x1,y1,x2,y2 = bbox
+    bw,bh = x2-x1, y2-y1
+    return [max(0,x1-int(bw*pad)), max(0,y1-int(bh*pad)),
+            min(W,x2+int(bw*pad)), min(H,y2+int(bh*pad))]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -424,114 +449,87 @@ class RetouchPipeline:
     def __init__(self):
         self.detector: Optional[FaceDetector] = None
         self.parser: Optional[FaceParser] = None
-        self.codeformer: Optional[torch.nn.Module] = None
+        self.codeformer = None
 
     def load_models(self):
         logger.info("Loading FaceDetector…")
         self.detector = FaceDetector()
         logger.info("Loading FaceParser…")
         self.parser = FaceParser()
-        logger.info("Loading CodeFormer…")
-        self.codeformer = load_codeformer(weight_path=CF_WEIGHT, device=DEVICE)
-        logger.info("All models loaded. RETOUCH_STRENGTH=%s smooth=%.2f db=%.2f tone=%.2f cf_blend=%.2f",
-                    _preset_name, SMOOTH_STRENGTH, DB_STRENGTH, TONE_STRENGTH, CF_BLEND)
+        logger.info("Loading CodeFormer (fidelity=%.2f blend=%.2f)…", CF_FIDELITY, CF_BLEND)
+        self.codeformer = load_codeformer(device=DEVICE)  # None если не удалось
+        logger.info(
+            "Pipeline ready | strength=%s smooth=%.2f db=%.2f tone=%.2f cf=%.2f",
+            _pname, SMOOTH_STR, DB_STR, TONE_STR, CF_BLEND
+        )
 
     def run(self, img_bgr: np.ndarray) -> tuple[np.ndarray, dict]:
-        """
-        Полный pipeline ретуши.
-        Returns: (result_bgr, stats_dict)
-        """
-        if not all([self.detector, self.parser, self.codeformer]):
-            raise RuntimeError("Models not loaded.")
-
-        h, w = img_bgr.shape[:2]
+        H, W = img_bgr.shape[:2]
         result = img_bgr.copy()
         stats = {
-            "faces_found": 0,
-            "codeformer_applied": False,
-            "db_applied": False,
-            "smooth_applied": False,
-            "retouch_strength": _preset_name,
-            "smooth_strength": SMOOTH_STRENGTH,
-            "db_strength": DB_STRENGTH,
-            "cf_fidelity": CF_FIDELITY,
-            "cf_blend": CF_BLEND,
+            "faces": 0, "cf_applied": False,
+            "strength": _pname,
+            "smooth": SMOOTH_STR, "db": DB_STR, "tone": TONE_STR,
+            "cf_blend": CF_BLEND, "cf_fidelity": CF_FIDELITY,
         }
 
-        # ── Detect faces ───────────────────────────────────────────────────
         faces = self.detector.detect(img_bgr)
-        stats["faces_found"] = len(faces)
-        logger.info("Faces found: %d", len(faces))
+        stats["faces"] = len(faces)
+        logger.info("Faces detected: %d", len(faces))
 
         if not faces:
-            logger.info("No faces — applying mild global polish")
-            try:
-                skin_mask = self.parser.get_skin_mask(img_bgr)
-                result = frequency_separation_smooth(result, skin_mask, strength=0.25)
-                result = dodge_and_burn(result, skin_mask, strength=0.08)
-                stats["smooth_applied"] = True
-            except Exception as exc:
-                logger.warning("Global polish failed: %s", exc)
+            logger.info("No faces — skipping retouch")
             return result, stats
 
-        for face in faces:
-            bbox = _pad_bbox(face["bbox"], h, w, pad=0.35)
-            x1, y1, x2, y2 = bbox
-            face_crop = safe_crop(img_bgr, x1, y1, x2, y2)
-            if face_crop.size == 0:
+        for face_info in faces:
+            x1,y1,x2,y2 = _pad_bbox(face_info["bbox"], H, W, pad=0.35)
+            crop = safe_crop(img_bgr, x1, y1, x2, y2)
+            if crop.size == 0:
                 continue
 
-            fh, fw = face_crop.shape[:2]
-            logger.info("Processing face %dx%d at [%d,%d,%d,%d]", fw, fh, x1, y1, x2, y2)
+            fH, fW = crop.shape[:2]
+            logger.info("Face crop: %dx%d", fW, fH)
 
             try:
                 # ── 1. Skin mask ───────────────────────────────────────────
-                skin_mask = self.parser.get_skin_mask(face_crop)
-                skin_smooth = feather_mask(
-                    dilate_mask((skin_mask * 255).astype(np.uint8), ksize=7, iterations=1) / 255.0,
-                    radius=12,
+                skin = self.parser.skin_mask(crop)
+
+                # Убираем края маски — более точная маска = меньше артефактов
+                skin = erode_mask(skin, ksize=3, iters=1)
+                skin_soft = feather_mask(
+                    dilate_mask(skin, ksize=5, iters=1), radius=10
                 )
 
-                # ── 2. Blemish removal (inpainting) ───────────────────────
-                processed = remove_blemishes(face_crop, skin_mask)
+                # ── 2. Blemish removal ─────────────────────────────────────
+                processed = remove_blemishes(crop, skin, percentile=BLEMISH_PERC)
 
                 # ── 3. Skin tone evening ───────────────────────────────────
-                processed = even_skin_tone(processed, skin_smooth, strength=TONE_STRENGTH)
+                processed = even_skin_tone(processed, skin_soft, strength=TONE_STR)
 
-                # ── 4. Dodge & Burn ────────────────────────────────────────
-                processed = dodge_and_burn(processed, skin_smooth, strength=DB_STRENGTH)
-                stats["db_applied"] = True
+                # ── 4. Dodge & Burn (только low-freq, текстура сохранена) ──
+                processed = dodge_and_burn(processed, skin_soft, strength=DB_STR)
 
-                # ── 5. Frequency separation smooth ─────────────────────────
-                processed = frequency_separation_smooth(processed, skin_smooth, strength=SMOOTH_STRENGTH)
-                stats["smooth_applied"] = True
+                # ── 5. Цветовое сглаживание (только a,b каналы, не L) ─────
+                processed = smooth_skin_color(processed, skin_soft, strength=SMOOTH_STR)
 
-                # ── 6. CodeFormer — минимально ─────────────────────────────
-                processed, cf_applied = run_codeformer_minimal(
-                    processed, self.codeformer, skin_smooth,
-                    fidelity=CF_FIDELITY, blend=CF_BLEND,
+                # ── 6. CodeFormer (минимально) ─────────────────────────────
+                processed, cf_ok = apply_codeformer(
+                    processed, self.codeformer, skin_soft, CF_FIDELITY, CF_BLEND
                 )
-                if cf_applied:
-                    stats["codeformer_applied"] = True
+                if cf_ok:
+                    stats["cf_applied"] = True
 
-                # ── 7. Composite face → original ───────────────────────────
-                pad_px = max(15, int(min(fh, fw) * 0.08))
-                comp_mask = np.zeros((fh, fw), np.float32)
-                comp_mask[pad_px:-pad_px, pad_px:-pad_px] = 1.0
-                comp_mask = feather_mask(comp_mask, radius=pad_px)
+                # ── 7. Composite — бесшовная вставка ──────────────────────
+                pad_px = max(20, int(min(fH, fW) * 0.07))
+                comp = np.zeros((fH, fW), np.float32)
+                comp[pad_px:-pad_px, pad_px:-pad_px] = 1.0
+                comp = feather_mask(comp, radius=pad_px)
 
-                blended = blend_with_mask(processed, face_crop, comp_mask)
+                blended = blend_layers(processed, crop, comp)
                 result[y1:y2, x1:x2] = blended
 
-            except Exception as exc:
-                logger.exception("Face processing failed: %s", exc)
-                continue
+            except Exception as e:
+                logger.exception("Face retouch failed: %s", e)
 
-        logger.info(
-            "Pipeline done: faces=%d cf=%s db=%s smooth=%s",
-            stats["faces_found"],
-            stats["codeformer_applied"],
-            stats["db_applied"],
-            stats["smooth_applied"],
-        )
+        logger.info("Done: faces=%d cf=%s", stats["faces"], stats["cf_applied"])
         return result, stats
