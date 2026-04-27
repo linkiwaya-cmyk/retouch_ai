@@ -1,37 +1,34 @@
-# ── Web framework ───────────────────────────────────────────────────────────────
+# Web framework
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
 python-multipart==0.0.9
 
-# ── Image processing ────────────────────────────────────────────────────────────
+# Image processing
 opencv-python-headless==4.9.0.80
 numpy==1.26.4
 Pillow==10.3.0
+pillow-heif==0.16.0      # HEIC/HEIF поддержка (iPhone фото)
+piexif==1.1.3            # EXIF редактирование (сохранение метаданных)
 scikit-image==0.23.2
 scipy==1.13.0
 
-# ── Deep learning ───────────────────────────────────────────────────────────────
+# Deep learning
 torch==2.3.0
 torchvision==0.18.0
 
-# ── Face detection ──────────────────────────────────────────────────────────────
+# Face detection
 insightface==0.7.3
-onnxruntime==1.18.0
-# facexlib даёт RetinaFace fallback + BiSeNet (face parsing)
+onnxruntime-gpu==1.18.0  # замени на onnxruntime если нет GPU
+
+# Face parsing + RetinaFace fallback
 facexlib==0.3.0
 
-# ── HTTP / async ────────────────────────────────────────────────────────────────
+# HTTP / async
 httpx==0.27.0
+aiohttp==3.9.5
 aiofiles==23.2.1
 requests==2.32.2
 
-# ── Telegram bot ─────────────────────────────────────────────────────────────────
-python-telegram-bot==21.3
-
-# ── Misc ─────────────────────────────────────────────────────────────────────────
+# Telegram bot
+aiogram==3.7.0
 python-dotenv==1.0.1
-
-# ── NOTE: basicsr НЕ нужен ──────────────────────────────────────────────────────
-# codeformer_loader.py содержит архитектуру инлайн.
-# Если хочешь установить basicsr (опционально, для других утилит):
-#   pip install git+https://github.com/XPixelGroup/BasicSR.git
