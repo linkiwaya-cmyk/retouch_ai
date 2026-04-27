@@ -1,7 +1,14 @@
+"""
+bot.py — Telegram бот Retouch Lab (aiogram 3.x)
+
+Принимает: photo, document (JPEG/PNG/HEIC/WebP)
+Отправляет: ТОЛЬКО sendDocument, имя retouched_<original>.jpg
+"""
+
 import asyncio
+import io
 import logging
 import os
-import io
 
 import aiohttp
 from aiogram import Bot, Dispatcher, F
@@ -17,7 +24,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-RUNPOD_URL = os.getenv("RUNPOD_URL", "https://ychsinzriqqmll-8000.proxy.runpod.net/process-image")
+RUNPOD_URL = os.getenv(
+    "RUNPOD_URL",
+    "https://ychsinzriqqmll-8000.proxy.runpod.net/process-image",
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,13 +58,13 @@ back_menu = ReplyKeyboardMarkup(
 async def start(message: Message):
     await message.answer(
         "Привет! 👋\n\n"
-        "Я *Retouch Lab* — AI бот для профессиональной обработки фото.\n\n"
+        "Я *Retouch Lab* — AI ретушёр от *Linkiway*.\n\n"
         "Что я умею:\n\n"
-        "✨ выравнивать свет\n"
-        "🎨 улучшать цвет\n"
-        "🧴 делать natural skin tone\n"
-        "📷 повышать качество изображения\n\n"
-        "Выберите действие ниже 👇",
+        "✨ убираю дефекты кожи\n"
+        "🎨 сохраняю натуральный тон\n"
+        "🧴 natural skin tone\n"
+        "📷 сохраняю оригинальное качество\n\n"
+        "Отправьте фото — как фотографию или файлом 👇",
         reply_markup=main_menu,
         parse_mode="Markdown",
     )
@@ -64,12 +74,17 @@ async def start(message: Message):
 async def process_photo_menu(message: Message):
     await message.answer(
         "📸 *Обработка фото*\n\n"
-        "Отправьте фотографию *файлом* (скрепка → документ) или просто фото.\n\n"
-        "Что я сделаю:\n\n"
+        "Отправьте фото *файлом* для максимального качества\n"
+        "или просто как фотографию.\n\n"
+        "Поддерживаю:\n"
+        "• JPEG / PNG\n"
+        "• iPhone (HEIC)\n"
+        "• Android фото\n\n"
+        "Что сделаю:\n\n"
         "✨ уберу дефекты кожи\n"
         "🎨 сохраню натуральный тон\n"
-        "🧴 natural skin tone\n"
-        "📷 повышу детализацию\n\n"
+        "🧴 аккуратная ретушь без пластика\n"
+        "📷 оригинальное разрешение и качество\n\n"
         "Жду фото 📸",
         reply_markup=back_menu,
         parse_mode="Markdown",
@@ -80,11 +95,11 @@ async def process_photo_menu(message: Message):
 async def enhance_menu(message: Message):
     await message.answer(
         "✨ *Улучшение качества*\n\n"
-        "AI восстановит:\n\n"
-        "• старые фотографии\n"
-        "• размытые фото\n"
-        "• фото низкого качества\n\n"
-        "Отправьте фотографию файлом или как фото.",
+        "AI аккуратно улучшит:\n\n"
+        "• чистоту кожи\n"
+        "• детализацию\n"
+        "• локальный контраст\n\n"
+        "Отправьте фото файлом или как фото.",
         reply_markup=back_menu,
         parse_mode="Markdown",
     )
@@ -96,22 +111,26 @@ async def subscription(message: Message):
         "💎 *Подписка Retouch Lab*\n\n"
         "Выберите удобный тариф:\n\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "🗓 *1 месяц*\n"
-        "14$ / ~1 200 сом\n"
+        "📅 *1 месяц*\n"
+        "20$ / ~1 800 сом\n"
         "До 300 фото\n\n"
-        "🗓 *3 месяца*\n"
-        "40$ / ~3 500 сом\n"
-        "До 1 000 фото · экономия 17%\n\n"
-        "🗓 *6 месяцев*\n"
+        "📅 *3 месяца*\n"
+        "50$ / ~4 500 сом\n"
+        "Экономия 17%\n\n"
+        "📅 *6 месяцев*\n"
         "80$ / ~7 000 сом\n"
-        "До 2 500 фото · экономия 33%\n\n"
-        "🗓 *1 год*\n"
-        "115$ / ~9 999 сом\n"
-        "Безлимит · экономия 52%\n"
+        "Экономия 33%\n\n"
+        "📅 *1 год*\n"
+        "115$ / ~10 000 сом\n"
+        "Экономия 52% 🔥\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
-        "💍 *Скоро:* эксклюзивная функция для свадебных фотографов — "
-        "пакетная обработка галереи с единым стилем ретуши.\n\n"
-        "Для оплаты и вопросов напишите нам — @linkaway\\_support",
+        "Все тарифы включают:\n"
+        "✅ AI ретушь кожи\n"
+        "✅ Сохранение оригинального качества\n"
+        "✅ Natural skin tone\n\n"
+        "💍 *Скоро* — эксклюзивная функция для свадебных фотографов!\n"
+        "Пакетная обработка галереи с единым стилем ретуши.\n\n"
+        "По вопросам оплаты: @linkiway\\_support",
         reply_markup=back_menu,
         parse_mode="Markdown",
     )
@@ -127,12 +146,12 @@ async def about(message: Message):
         "🎥 блогерам\n"
         "💍 свадебным фотографам\n"
         "🧑‍💻 креаторам\n\n"
-        "AI автоматически:\n\n"
+        "AI делает:\n\n"
         "✨ убирает дефекты кожи\n"
         "🎨 сохраняет натуральный тон\n"
-        "🧴 natural skin tone\n"
-        "📷 повышает детализацию\n\n"
-        "То, что раньше занимало 20 минут ретуши — теперь занимает несколько секунд.\n\n"
+        "🧴 natural skin tone без пластика\n"
+        "📷 оригинальное разрешение и качество\n\n"
+        "То, что раньше занимало 20 минут ретуши — теперь секунды.\n\n"
         "🔗 *Linkiway* — технологии для творческих людей.",
         reply_markup=back_menu,
         parse_mode="Markdown",
@@ -146,10 +165,18 @@ async def back(message: Message):
 
 # ── Общая функция отправки в API ───────────────────────────────────────────────
 
-async def _send_to_api(image_bytes: bytes, user_id: str, filename: str = "photo.jpg") -> bytes | None:
-    """Отправляет изображение в FastAPI, возвращает байты результата или None."""
+async def _send_to_api(
+    image_bytes: bytes,
+    user_id: str,
+    filename: str,
+) -> bytes | str:
+    """
+    Отправляет изображение в FastAPI backend.
+    Возвращает байты результата или строку-статус ('limit', 'timeout', 'error').
+    """
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120)) as session:
+        timeout = aiohttp.ClientTimeout(total=180)  # 3 минуты
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             form = aiohttp.FormData()
             form.add_field(
                 "file",
@@ -163,8 +190,9 @@ async def _send_to_api(image_bytes: bytes, user_id: str, filename: str = "photo.
                 if resp.status == 429:
                     return "limit"
                 if resp.status != 200:
-                    logger.error("API error: %s %s", resp.status, await resp.text())
-                    return None
+                    text = await resp.text()
+                    logger.error("API error %d: %s", resp.status, text[:200])
+                    return "error"
                 return await resp.read()
 
     except asyncio.TimeoutError:
@@ -172,61 +200,84 @@ async def _send_to_api(image_bytes: bytes, user_id: str, filename: str = "photo.
         return "timeout"
     except Exception as exc:
         logger.exception("API request failed: %s", exc)
-        return None
+        return "error"
 
 
-async def _process_and_reply(message: Message, image_bytes: bytes, filename: str = "photo.jpg"):
-    """Общий pipeline: скачал → отправил в API → ответил файлом."""
+async def _process_and_reply(
+    message: Message,
+    image_bytes: bytes,
+    original_filename: str,
+):
+    """Скачал → API → отправить файлом."""
     user_id = str(message.from_user.id)
+    mb = len(image_bytes) / 1024 / 1024
+    logger.info("Received %.2f MB from user %s, file=%s", mb, user_id, original_filename)
+
     status_msg = await message.answer("⏳ Обрабатываю фото, подождите...")
 
-    result = await _send_to_api(image_bytes, user_id, filename)
+    result = await _send_to_api(image_bytes, user_id, original_filename)
 
     await status_msg.delete()
 
     if result == "limit":
-        await message.answer("❌ Лимит обработок исчерпан (1000 изображений).")
+        await message.answer("❌ Лимит обработок исчерпан.")
         return
     if result == "timeout":
         await message.answer("❌ Сервер не ответил. Попробуйте через минуту.")
         return
-    if result is None:
+    if result == "error" or not isinstance(result, bytes):
         await message.answer("❌ Ошибка обработки. Попробуйте ещё раз.")
         return
 
-    # Отправляем как документ — сохраняет оригинальное качество (не сжимает)
-    output_file = BufferedInputFile(result, filename="retouched.jpg")
+    # Имя выходного файла: retouched_<original>.jpg
+    stem = original_filename.rsplit(".", 1)[0]
+    out_filename = f"retouched_{stem}.jpg"
+
+    # ТОЛЬКО sendDocument — сохраняет оригинальное качество
+    output_file = BufferedInputFile(result, filename=out_filename)
     await message.answer_document(
         output_file,
-        caption="✨ Готово! Файл сохранён в оригинальном качестве.",
+        caption=(
+            "✨ *Готово!*\n\n"
+            "Файл сохранён в оригинальном качестве.\n"
+            f"📄 `{out_filename}`"
+        ),
+        parse_mode="Markdown",
     )
 
+    result_mb = len(result) / 1024 / 1024
+    logger.info("Sent result %.2f MB to user %s", result_mb, user_id)
 
-# ── Приём фото как ДОКУМЕНТ (несжатое, лучшее качество) ───────────────────────
+
+# ── Приём фото как ДОКУМЕНТ (несжатое — лучшее качество) ──────────────────────
 
 @dp.message(F.document)
 async def get_photo_as_document(message: Message):
     doc = message.document
 
-    # Проверяем что это изображение
-    if doc.mime_type and not doc.mime_type.startswith("image/"):
-        await message.answer("Пожалуйста, отправьте изображение (JPEG, PNG).")
-        return
+    # Принимаем только изображения
+    allowed_mime = {"image/jpeg", "image/png", "image/heic", "image/heif", "image/webp"}
+    if doc.mime_type and doc.mime_type not in allowed_mime:
+        if not doc.mime_type.startswith("image/"):
+            await message.answer(
+                "Пожалуйста, отправьте изображение (JPEG, PNG, HEIC, WebP)."
+            )
+            return
 
-    # Скачиваем
     file = await bot.get_file(doc.file_id)
     buf = io.BytesIO()
     await bot.download_file(file.file_path, destination=buf)
     image_bytes = buf.getvalue()
 
-    await _process_and_reply(message, image_bytes, filename=doc.file_name or "photo.jpg")
+    filename = doc.file_name or "photo.jpg"
+    await _process_and_reply(message, image_bytes, filename)
 
 
-# ── Приём фото как ФОТО (сжатое Telegram'ом, но тоже принимаем) ───────────────
+# ── Приём фото как ФОТО (Telegram сжимает до ~1280px) ─────────────────────────
 
 @dp.message(F.photo)
 async def get_photo_as_photo(message: Message):
-    # Берём самое большое разрешение
+    # Самое большое доступное разрешение
     photo = message.photo[-1]
 
     file = await bot.get_file(photo.file_id)
@@ -235,16 +286,17 @@ async def get_photo_as_photo(message: Message):
     image_bytes = buf.getvalue()
 
     await message.answer(
-        "💡 Совет: для лучшего качества отправляйте фото *файлом* (скрепка → документ).",
+        "💡 *Совет:* для лучшего качества отправляйте фото *файлом*\n"
+        "(скрепка → Файл → выберите фото)",
         parse_mode="Markdown",
     )
-    await _process_and_reply(message, image_bytes, filename="photo.jpg")
+    await _process_and_reply(message, image_bytes, "photo.jpg")
 
 
 # ── Запуск ─────────────────────────────────────────────────────────────────────
 
 async def main():
-    logger.info("Bot started.")
+    logger.info("Retouch Lab bot starting…")
     await dp.start_polling(bot)
 
 
