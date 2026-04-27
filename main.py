@@ -1,10 +1,5 @@
 """
-main.py — FastAPI backend для AI ретуши.
-
-POST /process-image:
-  - принимает файл любого формата (JPEG, PNG, HEIC)
-  - возвращает JPEG quality=98, оригинальное разрешение
-  - логирует размеры входа/выхода
+main.py v3 — FastAPI backend, quality=100, подробные логи
 """
 
 import io
@@ -23,23 +18,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ── Usage limits (in-memory) ───────────────────────────────────────────────────
 _usage: dict[str, int] = {}
 MAX_PER_USER = 1000
+
+pipeline: RetouchPipeline | None = None
 
 
 def _check_limit(user_id: str) -> None:
     count = _usage.get(user_id, 0)
     if count >= MAX_PER_USER:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Limit reached: {MAX_PER_USER} images per user.",
-        )
+        raise HTTPException(status_code=429, detail="Limit reached.")
     _usage[user_id] = count + 1
-
-
-# ── Lifecycle ──────────────────────────────────────────────────────────────────
-pipeline: RetouchPipeline | None = None
 
 
 @asynccontextmanager
@@ -53,10 +42,8 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown.")
 
 
-app = FastAPI(title="Photo Retouch API", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Retouch API v3", version="3.0.0", lifespan=lifespan)
 
-
-# ── Endpoint ───────────────────────────────────────────────────────────────────
 
 @app.post("/process-image")
 async def process_image(
@@ -71,40 +58,51 @@ async def process_image(
 
     original_filename = file.filename or "photo.jpg"
     input_mb = len(raw) / 1024 / 1024
-    logger.info(
-        "IN  file=%s user=%s size=%.2f MB",
-        original_filename, user_id, input_mb,
-    )
 
-    # Decode (EXIF ориентация применяется автоматически)
+    # ── Decode ─────────────────────────────────────────────────────────────
     try:
         img_bgr, meta = decode_image(raw)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Cannot decode image: {exc}")
+        raise HTTPException(status_code=400, detail=f"Cannot decode: {exc}")
 
     h, w = img_bgr.shape[:2]
-    logger.info("IN  resolution: %dx%d", w, h)
 
-    # Process
+    logger.info("=" * 60)
+    logger.info("IN  file     : %s", original_filename)
+    logger.info("IN  format   : %s", meta.get("format", "?"))
+    logger.info("IN  size     : %.2f MB", input_mb)
+    logger.info("IN  resolution: %dx%d", w, h)
+    logger.info("IN  user     : %s  (used %d/%d)", user_id, _usage.get(user_id, 0), MAX_PER_USER)
+
+    # ── Process ────────────────────────────────────────────────────────────
     try:
-        result_bgr = pipeline.run(img_bgr)  # type: ignore
+        result_bgr, stats = pipeline.run(img_bgr)   # type: ignore
     except Exception as exc:
         logger.exception("Pipeline error")
         raise HTTPException(status_code=500, detail=f"Processing error: {exc}")
 
     rh, rw = result_bgr.shape[:2]
-    if rh != h or rw != w:
-        logger.error("Resolution changed! %dx%d → %dx%d", w, h, rw, rh)
 
-    # Encode — quality=98, сохраняем EXIF и ICC
-    out_bytes = encode_image_to_bytes(result_bgr, meta, quality=98)
+    # ── Encode quality=100 ─────────────────────────────────────────────────
+    out_bytes = encode_image_to_bytes(result_bgr, meta, quality=100)
     output_mb = len(out_bytes) / 1024 / 1024
-    logger.info(
-        "OUT resolution: %dx%d size=%.2f MB (input was %.2f MB)",
-        rw, rh, output_mb, input_mb,
-    )
 
-    # Имя выходного файла: retouched_<original>
+    logger.info("OUT resolution: %dx%d", rw, rh)
+    logger.info("OUT size      : %.2f MB (in=%.2f MB)", output_mb, input_mb)
+    logger.info("OUT quality   : 100, subsampling=0 (4:4:4)")
+    logger.info("RETOUCH strength : %s", stats.get("retouch_strength"))
+    logger.info("RETOUCH smooth   : %.2f", stats.get("smooth_strength", 0))
+    logger.info("RETOUCH db       : %.2f", stats.get("db_strength", 0))
+    logger.info("RETOUCH faces    : %d", stats.get("faces_found", 0))
+    logger.info("RETOUCH codeformer: %s (fidelity=%.2f blend=%.2f)",
+                stats.get("codeformer_applied"), stats.get("cf_fidelity"), stats.get("cf_blend"))
+    logger.info("RETOUCH db_applied: %s", stats.get("db_applied"))
+    logger.info("RETOUCH smooth_applied: %s", stats.get("smooth_applied"))
+    logger.info("=" * 60)
+
+    if rh != h or rw != w:
+        logger.error("RESOLUTION CHANGED! %dx%d → %dx%d", w, h, rw, rh)
+
     stem = original_filename.rsplit(".", 1)[0]
     out_filename = f"retouched_{stem}.jpg"
 
@@ -115,21 +113,23 @@ async def process_image(
             "Content-Disposition": f'attachment; filename="{out_filename}"',
             "X-Input-Resolution": f"{w}x{h}",
             "X-Output-Resolution": f"{rw}x{rh}",
-            "X-Input-Size-MB": f"{input_mb:.2f}",
-            "X-Output-Size-MB": f"{output_mb:.2f}",
+            "X-Input-MB": f"{input_mb:.2f}",
+            "X-Output-MB": f"{output_mb:.2f}",
+            "X-Faces-Found": str(stats.get("faces_found", 0)),
+            "X-Retouch-Strength": stats.get("retouch_strength", "?"),
         },
     )
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "pipeline_ready": pipeline is not None}
+    return {
+        "status": "ok",
+        "pipeline_ready": pipeline is not None,
+        "retouch_strength": pipeline and "loaded",
+    }
 
 
 @app.get("/usage/{user_id}")
 async def usage(user_id: str):
-    return {
-        "user_id": user_id,
-        "used": _usage.get(user_id, 0),
-        "limit": MAX_PER_USER,
-    }
+    return {"user_id": user_id, "used": _usage.get(user_id, 0), "limit": MAX_PER_USER}
