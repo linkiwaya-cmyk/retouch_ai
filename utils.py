@@ -1,139 +1,156 @@
 """
-utils.py v6
+utils.py v7 — HEIC bulletproof, quality=100
 
-HEIC fix: "Too many auxiliary image references" — берём ТОЛЬКО primary image
-через pillow_heif напрямую, игнорируем depth/live-photo auxiliary layers.
+HEIC fallback chain:
+  1. pillow_heif.open_heif  — primary image only (fixes "too many auxiliary")
+  2. PIL Image.open         — универсальный
+  3. cv2.imdecode           — JPEG/PNG
+  4. subprocess imagemagick — последний резерв
 """
 from __future__ import annotations
 
 import io
 import logging
+import subprocess
+import tempfile
 import time
-import numpy as np
+from pathlib import Path
+
 import cv2
+import numpy as np
 from PIL import Image, ImageOps
 
 logger = logging.getLogger(__name__)
 
-# ── HEIC регистрация на уровне модуля ─────────────────────────────────────────
+# ── HEIC регистрация ───────────────────────────────────────────────────────────
 _HEIC_OK = False
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
     _HEIC_OK = True
-    logger.info("HEIC/HEIF: enabled via pillow-heif")
+    logger.info("HEIC: pillow_heif registered")
 except ImportError:
-    logger.warning("HEIC disabled — pip install pillow-heif")
+    logger.warning("pillow_heif not installed — pip install pillow-heif")
 except Exception as e:
-    logger.warning("HEIC register failed: %s", e)
+    logger.warning("pillow_heif register failed: %s", e)
 
 
-def _pil_to_bgr(pil_img: Image.Image) -> np.ndarray:
-    """PIL RGB/RGBA → BGR uint8"""
-    if pil_img.mode == "RGBA":
-        bg = Image.new("RGB", pil_img.size, (255, 255, 255))
-        bg.paste(pil_img, mask=pil_img.split()[3])
-        pil_img = bg
-    elif pil_img.mode != "RGB":
-        pil_img = pil_img.convert("RGB")
-    return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+def _pil_to_bgr(img: Image.Image) -> np.ndarray:
+    if img.mode == "RGBA":
+        bg = Image.new("RGB", img.size, (255, 255, 255))
+        bg.paste(img, mask=img.split()[3])
+        img = bg
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+    return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+
+def _try_imagemagick(raw_bytes: bytes) -> np.ndarray | None:
+    """Fallback через ImageMagick convert."""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".heic", delete=False) as f:
+            f.write(raw_bytes)
+            src = f.name
+        dst = src.replace(".heic", ".jpg")
+        r = subprocess.run(
+            ["convert", src, "-quality", "95", dst],
+            capture_output=True, timeout=30,
+        )
+        if r.returncode == 0 and Path(dst).exists():
+            img = cv2.imread(dst)
+            Path(src).unlink(missing_ok=True)
+            Path(dst).unlink(missing_ok=True)
+            if img is not None:
+                logger.info("HEIC decoded via ImageMagick")
+                return img
+    except Exception as e:
+        logger.warning("ImageMagick fallback failed: %s", e)
+    return None
 
 
 def decode_image(raw_bytes: bytes) -> tuple[np.ndarray, dict]:
     """
-    Декодирует JPEG / PNG / HEIC / HEIF / WebP → BGR uint8.
-    HEIC: берёт только primary image, игнорирует auxiliary (depth/live-photo).
+    Декодирует любой формат → BGR uint8.
+    HEIC: 4 последовательных метода, берём только primary image.
     """
     t0 = time.time()
     meta = {"exif": None, "icc_profile": None, "original_size": None, "format": "JPEG"}
 
-    # ── Попытка 1: HEIC через pillow_heif напрямую (primary image only) ───
-    # Это решает "Too many auxiliary image references"
+    # ── 1. pillow_heif.open_heif — primary image only ─────────────────────
     if _HEIC_OK:
         try:
             import pillow_heif
-            # read_heif берёт primary image и игнорирует auxiliary layers
-            heif_file = pillow_heif.open_heif(raw_bytes, convert_hdr_to_8bit=True)
-            # Берём только первый (primary) image
-            primary = heif_file[0]
-            pil_img = Image.frombytes(
-                primary.mode,
-                primary.size,
-                primary.data,
-                "raw",
-                primary.mode,
-            )
-            # EXIF ориентация
-            if hasattr(primary, "info") and primary.info.get("exif"):
-                meta["exif"] = primary.info["exif"]
+            hf = pillow_heif.open_heif(io.BytesIO(raw_bytes), convert_hdr_to_8bit=True)
+            primary = hf[0]  # только primary, игнорируем depth/live-photo layers
+            pil_img = primary.to_pillow()
+            meta["exif"] = pil_img.info.get("exif")
+            meta["icc_profile"] = pil_img.info.get("icc_profile")
             pil_img = ImageOps.exif_transpose(pil_img)
             if pil_img.mode != "RGB":
                 pil_img = pil_img.convert("RGB")
             meta["format"] = "HEIC"
             meta["original_size"] = pil_img.size
-            img_bgr = _pil_to_bgr(pil_img)
-            logger.info("Decoded HEIC (primary): %dx%d in %.2fs", *pil_img.size, time.time()-t0)
-            return img_bgr, meta
+            img = _pil_to_bgr(pil_img)
+            logger.info("Decoded HEIC (open_heif primary): %dx%d %.2fs", *pil_img.size, time.time()-t0)
+            return img, meta
         except Exception as e:
-            # Если HEIC не сработал — пробуем дальше
-            if "heic" in str(type(e).__name__).lower() or "heif" in str(e).lower() or "auxiliary" in str(e).lower():
-                logger.warning("HEIC primary decode failed: %s — trying PIL fallback", e)
-            # иначе просто продолжаем
+            logger.warning("open_heif failed: %s", e)
 
-    # ── Попытка 2: PIL универсальный (JPEG, PNG, WebP, HEIC если зарегистрирован) ──
+    # ── 2. PIL универсальный (JPEG, PNG, WebP, HEIC если зарегистрирован) ──
     try:
-        buf = io.BytesIO(raw_bytes)
-        pil_img = Image.open(buf)
+        pil_img = Image.open(io.BytesIO(raw_bytes))
         pil_img.load()
         meta["format"] = pil_img.format or "JPEG"
         meta["exif"] = pil_img.info.get("exif")
         meta["icc_profile"] = pil_img.info.get("icc_profile")
         pil_img = ImageOps.exif_transpose(pil_img)
         meta["original_size"] = pil_img.size
-        img_bgr = _pil_to_bgr(pil_img)
-        logger.info("Decoded %s: %dx%d in %.2fs", meta["format"], *pil_img.size, time.time()-t0)
-        return img_bgr, meta
+        img = _pil_to_bgr(pil_img)
+        logger.info("Decoded via PIL: %s %dx%d %.2fs", meta["format"], *pil_img.size, time.time()-t0)
+        return img, meta
     except Exception as e:
-        logger.warning("PIL decode failed: %s", e)
+        logger.warning("PIL failed: %s", e)
 
-    # ── Попытка 3: cv2 (JPEG/PNG без EXIF) ────────────────────────────────
+    # ── 3. cv2 (JPEG/PNG) ─────────────────────────────────────────────────
     arr = np.frombuffer(raw_bytes, np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is not None:
         meta["original_size"] = (img.shape[1], img.shape[0])
-        logger.info("Decoded via cv2: %dx%d in %.2fs", img.shape[1], img.shape[0], time.time()-t0)
+        logger.info("Decoded via cv2: %dx%d %.2fs", img.shape[1], img.shape[0], time.time()-t0)
         return img, meta
 
-    # ── Попытка 4: HEIC через pillow_heif.read_heif (старый API) ──────────
+    # ── 4. pillow_heif.read_heif (старый API) ─────────────────────────────
     if _HEIC_OK:
         try:
             import pillow_heif
             heif = pillow_heif.read_heif(raw_bytes)
             pil_img = Image.frombytes(heif.mode, heif.size, heif.data, "raw")
-            pil_img = ImageOps.exif_transpose(pil_img)
-            if pil_img.mode != "RGB":
-                pil_img = pil_img.convert("RGB")
+            pil_img = ImageOps.exif_transpose(pil_img.convert("RGB"))
             meta["format"] = "HEIC"
             meta["original_size"] = pil_img.size
-            img_bgr = _pil_to_bgr(pil_img)
+            img = _pil_to_bgr(pil_img)
             logger.info("Decoded HEIC (read_heif): %dx%d", *pil_img.size)
-            return img_bgr, meta
-        except Exception as e2:
-            logger.warning("HEIC read_heif failed: %s", e2)
+            return img, meta
+        except Exception as e:
+            logger.warning("read_heif failed: %s", e)
+
+    # ── 5. ImageMagick ────────────────────────────────────────────────────
+    img = _try_imagemagick(raw_bytes)
+    if img is not None:
+        meta["format"] = "HEIC"
+        meta["original_size"] = (img.shape[1], img.shape[0])
+        return img, meta
 
     raise ValueError(
-        f"Cannot decode image. "
-        f"Supported: JPEG, PNG, HEIC, HEIF, WebP. "
-        f"HEIC support: {'enabled' if _HEIC_OK else 'DISABLED'}."
+        "Cannot decode image. Supported: JPEG, PNG, HEIC, HEIF, WebP. "
+        f"HEIC: {'enabled' if _HEIC_OK else 'DISABLED — pip install pillow-heif'}."
     )
 
 
 def encode_image_to_bytes(img_bgr: np.ndarray, meta: dict, quality: int = 100) -> bytes:
-    """JPEG quality=100, subsampling=0 (4:4:4). Сохраняет ICC и EXIF."""
     t0 = time.time()
     H, W = img_bgr.shape[:2]
-    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-    pil_out = Image.fromarray(img_rgb)
+    pil_out = Image.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
     kwargs: dict = {
         "format": "JPEG", "quality": quality,
         "subsampling": 0, "optimize": False, "progressive": False,
@@ -171,12 +188,14 @@ def feather_mask(mask: np.ndarray, radius: int) -> np.ndarray:
 
 def dilate_mask(mask: np.ndarray, ksize: int = 5, iters: int = 1) -> np.ndarray:
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
-    return cv2.dilate((mask * 255).astype(np.uint8), k, iterations=iters).astype(np.float32) / 255.0
+    out = cv2.dilate((mask * 255).astype(np.uint8), k, iterations=iters)
+    return out.astype(np.float32) / 255.0
 
 
 def erode_mask(mask: np.ndarray, ksize: int = 3, iters: int = 1) -> np.ndarray:
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
-    return cv2.erode((mask * 255).astype(np.uint8), k, iterations=iters).astype(np.float32) / 255.0
+    out = cv2.erode((mask * 255).astype(np.uint8), k, iterations=iters)
+    return out.astype(np.float32) / 255.0
 
 
 def blend_layers(src: np.ndarray, dst: np.ndarray, alpha: np.ndarray) -> np.ndarray:
