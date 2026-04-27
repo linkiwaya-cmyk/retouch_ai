@@ -1,61 +1,67 @@
 """
-utils.py — image I/O, EXIF, ICC, HEIC, quality=100
+utils.py — image I/O, HEIC/HEIF, EXIF, quality=100
 """
-
 from __future__ import annotations
-
 import io
 import logging
-from pathlib import Path
-
-import cv2
 import numpy as np
+import cv2
 from PIL import Image, ImageOps
 
 logger = logging.getLogger(__name__)
 
+# HEIC — критически важно для iPhone
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
-    HEIF_SUPPORTED = True
     logger.info("HEIC/HEIF: enabled")
 except ImportError:
-    HEIF_SUPPORTED = False
-    logger.warning("HEIC/HEIF: disabled. pip install pillow-heif")
+    logger.warning("HEIC/HEIF: DISABLED — pip install pillow-heif")
 
 
 def decode_image(raw_bytes: bytes) -> tuple[np.ndarray, dict]:
+    """
+    Декодирует любой формат → BGR uint8.
+    Автоматически исправляет EXIF ориентацию (iPhone).
+    """
     meta = {"exif": None, "icc_profile": None, "original_size": None, "format": "JPEG"}
+
     try:
         pil_img = Image.open(io.BytesIO(raw_bytes))
         meta["format"] = pil_img.format or "JPEG"
-        meta["exif"] = pil_img.info.get("exif", None)
-        meta["icc_profile"] = pil_img.info.get("icc_profile", None)
+        meta["exif"] = pil_img.info.get("exif")
+        meta["icc_profile"] = pil_img.info.get("icc_profile")
+
+        # Исправляем ориентацию iPhone до конвертации
         pil_img = ImageOps.exif_transpose(pil_img)
+
         if pil_img.mode == "RGBA":
             bg = Image.new("RGB", pil_img.size, (255, 255, 255))
             bg.paste(pil_img, mask=pil_img.split()[3])
             pil_img = bg
         elif pil_img.mode != "RGB":
             pil_img = pil_img.convert("RGB")
-        meta["original_size"] = pil_img.size
-        logger.info("Decoded: format=%s size=%dx%d", meta["format"], pil_img.size[0], pil_img.size[1])
-        return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR), meta
-    except Exception as exc:
-        logger.warning("PIL decode failed (%s), fallback to cv2", exc)
 
-    arr = np.frombuffer(raw_bytes, dtype=np.uint8)
+        meta["original_size"] = pil_img.size  # (W, H)
+        w, h = pil_img.size
+        logger.info("Decoded: %s %dx%d", meta["format"], w, h)
+        return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR), meta
+
+    except Exception as exc:
+        logger.warning("PIL decode failed: %s — cv2 fallback", exc)
+
+    arr = np.frombuffer(raw_bytes, np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
-        raise ValueError("Cannot decode image.")
+        raise ValueError("Cannot decode image (unsupported format).")
     meta["original_size"] = (img.shape[1], img.shape[0])
     return img, meta
 
 
 def encode_image_to_bytes(img_bgr: np.ndarray, meta: dict, quality: int = 100) -> bytes:
     """
-    JPEG quality=100, subsampling=0 (4:4:4), optimize=False, progressive=False
-    Максимально близко к оригинальному весу файла.
+    JPEG quality=100, subsampling=0 (4:4:4).
+    Сохраняет ICC и EXIF (orientation сброшен в 1).
     """
     h, w = img_bgr.shape[:2]
     logger.info("Encoding: %dx%d quality=%d", w, h, quality)
@@ -63,59 +69,58 @@ def encode_image_to_bytes(img_bgr: np.ndarray, meta: dict, quality: int = 100) -
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     pil_out = Image.fromarray(img_rgb)
 
-    save_kwargs: dict = {
+    kwargs: dict = {
         "format": "JPEG",
         "quality": quality,
-        "subsampling": 0,       # 4:4:4 — без потерь хроминанса
+        "subsampling": 0,
         "optimize": False,
-        "progressive": False,   # не progressive — стандартный JPEG
+        "progressive": False,
     }
-
     if meta.get("icc_profile"):
-        save_kwargs["icc_profile"] = meta["icc_profile"]
-
+        kwargs["icc_profile"] = meta["icc_profile"]
     if meta.get("exif"):
-        exif_out = _reset_orientation_exif(meta["exif"])
-        if exif_out:
-            save_kwargs["exif"] = exif_out
+        kwargs["exif"] = _reset_orientation(meta["exif"])
 
     buf = io.BytesIO()
-    pil_out.save(buf, **save_kwargs)
-    result = buf.getvalue()
-    logger.info("Output: %.2f MB", len(result) / 1024 / 1024)
-    return result
+    pil_out.save(buf, **kwargs)
+    data = buf.getvalue()
+    logger.info("Output: %.2f MB", len(data) / 1024 / 1024)
+    return data
 
 
-def _reset_orientation_exif(exif_bytes: bytes) -> bytes | None:
+def _reset_orientation(exif_bytes: bytes) -> bytes:
     try:
         import piexif
-        exif_dict = piexif.load(exif_bytes)
-        ifd = exif_dict.get("0th", {})
-        if piexif.ImageIFD.Orientation in ifd:
-            ifd[piexif.ImageIFD.Orientation] = 1
-        return piexif.dump(exif_dict)
+        d = piexif.load(exif_bytes)
+        d.get("0th", {})[piexif.ImageIFD.Orientation] = 1
+        return piexif.dump(d)
     except Exception:
         return exif_bytes
 
 
-def dilate_mask(mask: np.ndarray, ksize: int = 5, iterations: int = 2) -> np.ndarray:
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
-    return cv2.dilate(mask, kernel, iterations=iterations)
+# ── Mask helpers ───────────────────────────────────────────────────────────────
+
+def feather_mask(mask: np.ndarray, radius: int) -> np.ndarray:
+    k = radius * 2 + 1
+    return np.clip(cv2.GaussianBlur(mask.astype(np.float32), (k, k), radius / 2), 0, 1)
 
 
-def feather_mask(mask: np.ndarray, radius: int = 15) -> np.ndarray:
-    ksize = radius * 2 + 1
-    blurred = cv2.GaussianBlur(mask.astype(np.float32), (ksize, ksize), radius / 2)
-    return np.clip(blurred, 0.0, 1.0)
+def dilate_mask(mask: np.ndarray, ksize: int = 5, iters: int = 1) -> np.ndarray:
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
+    return cv2.dilate(mask, k, iterations=iters)
 
 
-def blend_with_mask(src: np.ndarray, dst: np.ndarray, mask_f: np.ndarray) -> np.ndarray:
-    m = mask_f[..., np.newaxis]
-    return np.clip(
-        src.astype(np.float32) * m + dst.astype(np.float32) * (1.0 - m), 0, 255
-    ).astype(np.uint8)
+def erode_mask(mask: np.ndarray, ksize: int = 5, iters: int = 1) -> np.ndarray:
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
+    return cv2.erode(mask, k, iterations=iters)
 
 
-def safe_crop(img: np.ndarray, x1: int, y1: int, x2: int, y2: int) -> np.ndarray:
-    h, w = img.shape[:2]
-    return img[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
+def blend_layers(src: np.ndarray, dst: np.ndarray, alpha: np.ndarray) -> np.ndarray:
+    """src * alpha + dst * (1-alpha). alpha = float32 [0..1], broadcast over channels."""
+    a = alpha[..., np.newaxis]
+    return np.clip(src.astype(np.float32) * a + dst.astype(np.float32) * (1 - a), 0, 255).astype(np.uint8)
+
+
+def safe_crop(img: np.ndarray, x1, y1, x2, y2) -> np.ndarray:
+    H, W = img.shape[:2]
+    return img[max(0, y1):min(H, y2), max(0, x1):min(W, x2)]
