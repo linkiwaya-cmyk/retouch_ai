@@ -1,34 +1,34 @@
-# Web framework
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-python-multipart==0.0.9
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
 
-# Image processing
-opencv-python-headless==4.9.0.80
-numpy==1.26.4
-Pillow==10.3.0
-pillow-heif==0.16.0      # HEIC/HEIF поддержка (iPhone фото)
-piexif==1.1.3            # EXIF редактирование (сохранение метаданных)
-scikit-image==0.23.2
-scipy==1.13.0
+fastapi
+uvicorn[standard]
+python-multipart
+opencv-python-headless
+numpy
+Pillow>=10.0.0
 
-# Deep learning
-torch==2.3.0
-torchvision==0.18.0
+# ── iPhone (HEIC/HEIF) ─────────────────────────────────────────────────────────
+pillow-heif>=0.16.0        # HEIC/HEIF decode (основной)
+pyheif                      # fallback для старых HEIC файлов
 
-# Face detection
-insightface==0.7.3
-onnxruntime-gpu==1.18.0  # замени на onnxruntime если нет GPU
+# ── EXIF / метаданные ─────────────────────────────────────────────────────────
+piexif                      # чтение/запись EXIF (ориентация)
+exifread                    # дополнительный парсер EXIF
 
-# Face parsing + RetinaFace fallback
-facexlib==0.3.0
+# ── Android (WebP, JPEG, PNG) ─────────────────────────────────────────────────
+# Pillow>=10 уже поддерживает WebP, JPEG, PNG нативно
+# opencv-python-headless поддерживает все основные форматы Android
 
-# HTTP / async
-httpx==0.27.0
-aiohttp==3.9.5
-aiofiles==23.2.1
-requests==2.32.2
+# ── Face detection & parsing ──────────────────────────────────────────────────
+insightface
+facexlib
+onnxruntime-gpu             # GPU (если нет GPU — заменить на onnxruntime)
 
-# Telegram bot
-aiogram==3.7.0
-python-dotenv==1.0.1
+# ── AI retouch ────────────────────────────────────────────────────────────────
+codeformer-pip
+
+# ── Bot ───────────────────────────────────────────────────────────────────────
+aiogram>=3.7.0
+aiohttp
+python-dotenv
