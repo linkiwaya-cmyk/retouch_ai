@@ -1,9 +1,11 @@
-"""main.py v9"""
+"""main.py v10"""
 import io, logging, time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from pipeline import RetouchPipeline, TONE_STR, DB_STR, MICRO_STR
+from pipeline import RetouchPipeline, FIDELITY
+# легаси
+# from pipeline import TONE_STR, DB_STR, MICRO_STR
 from utils import decode_image, encode_image_to_bytes
 
 logging.basicConfig(level=logging.INFO,
@@ -24,13 +26,22 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Retouch API v9", lifespan=lifespan)
+app = FastAPI(title="Retouch API v10", lifespan=lifespan)
 
 
 @app.post("/process-image")
 async def process_image(
     file: UploadFile = File(...),
     user_id: str = Form(default="anonymous"),
+    fidelity:           float | None = Form(default=None),
+    background_enhance: bool  | None = Form(default=None),
+    face_upsample:      bool  | None = Form(default=None),
+    upscale:            int   | None = Form(default=None),
+    # легаси
+    # tone_strength:    float | None = Form(default=None),
+    # db_strength:      float | None = Form(default=None),
+    # micro_strength:   float | None = Form(default=None),
+    # blemish_strength: float | None = Form(default=None),
 ):
     c = _usage.get(user_id, 0)
     if c >= MAX_PER_USER:
@@ -62,7 +73,13 @@ async def process_image(
     logger.info("IN  decode    : %.2fs", t_dec)
 
     try:
-        result, stats = pipeline.run(img)  # type: ignore
+        result, stats = pipeline.run(
+            img,
+            fidelity=fidelity,
+            background_enhance=background_enhance,
+            face_upsample=face_upsample,
+            upscale=upscale,
+        )  # type: ignore
     except Exception as e:
         logger.exception("Pipeline error")
         raise HTTPException(500, f"Error: {e}")
@@ -82,7 +99,11 @@ async def process_image(
     logger.info("TIME encode   : %.2fs", t_enc)
     logger.info("TIME TOTAL    : %.2fs", ttotal)
     logger.info("FACES         : %d", stats.get("faces",0))
-    logger.info("PARAMS tone=%.2f db=%.2f micro=%.2f", TONE_STR, DB_STR, MICRO_STR)
+    logger.info("PARAMS fidelity=%.2f bg=%s up=%s scale=%d",
+                stats.get("fidelity", FIDELITY),
+                stats.get("bg_enhance", False),
+                stats.get("face_upsample", False),
+                stats.get("upscale", 1))
     logger.info("="*55)
 
     stem = fname.rsplit(".",1)[0]
