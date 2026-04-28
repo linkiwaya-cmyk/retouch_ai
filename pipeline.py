@@ -24,7 +24,7 @@ RetouchPipeline v9 — Photoshop Frequency Separation workflow
 """
 from __future__ import annotations
 
-import logging, os, time
+import logging, os, tempfile, time
 from pathlib import Path
 from typing import Optional
 
@@ -39,16 +39,20 @@ PARSING_DIR = os.environ.get("BISENET_WEIGHT_DIR", str(Path.home()/".cache/facex
 FACE_CONF   = float(os.environ.get("FACE_CONF", "0.5"))
 
 # ── Параметры ──────────────────────────────────────────────────────────────────
-TONE_STR  = float(os.environ.get("TONE_STRENGTH",  "0.60"))  # выравнивание тона/цвета
-DB_STR    = float(os.environ.get("DB_STRENGTH",    "0.50"))  # Dodge & Burn яркости
-MICRO_STR = float(os.environ.get("MICRO_STRENGTH", "0.28"))  # micro-contrast
-BLEMISH_PCT = float(os.environ.get("BLEMISH_MAX_PCT", "0.04"))
+FIDELITY = float(os.environ.get("FIDELITY", "0.5"))
+
+# легаси, FS параметры
+# TONE_STR  = float(os.environ.get("TONE_STRENGTH",  "0.60"))  # выравнивание тона/цвета
+# DB_STR    = float(os.environ.get("DB_STRENGTH",    "0.50"))  # Dodge & Burn яркости
+# MICRO_STR = float(os.environ.get("MICRO_STRENGTH", "0.28"))  # micro-contrast
+# BLEMISH_PCT = float(os.environ.get("BLEMISH_MAX_PCT", "0.04"))
+# BLEMISH_STR = float(os.environ.get("BLEMISH_STRENGTH", "0.0"))
 
 # Max сторона для обработки (скорость)
 MAX_PROC_SIZE = int(os.environ.get("MAX_PROC_SIZE", "2048"))
 
-_SKIN   = {1,2,3,4,5,6,7,8,9,10,13}
-_NOSKIN = {11,12,17,18}
+_SKIN   = {1, 7, 8, 10}
+_NOSKIN = {2, 3, 4, 5, 6, 11, 12, 13, 14, 15, 16, 17, 18}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -111,9 +115,12 @@ class FaceParser:
             logger.warning("BiSeNet: %s", e)
 
     def mask(self, face: np.ndarray) -> np.ndarray:
-        return self._bisenet(face) if self._net else self._hsv(face)
+        return self.parse(face)["skin"]
 
-    def _bisenet(self, face: np.ndarray) -> np.ndarray:
+    def parse(self, face: np.ndarray) -> dict:
+        if self._net is None:
+            m = self._hsv(face)
+            return {"skin": m, "pure": m}
         H,W = face.shape[:2]
         x = cv2.resize(face,(512,512))
         x = (cv2.cvtColor(x,cv2.COLOR_BGR2RGB).astype(np.float32)/255.
@@ -121,10 +128,18 @@ class FaceParser:
         t = torch.from_numpy(x.transpose(2,0,1)).unsqueeze(0).float().to(DEVICE)
         with torch.no_grad():
             seg = self._net(t)[0].squeeze(0).argmax(0).cpu().numpy().astype(np.uint8)
-        m = np.zeros((512,512),np.uint8)
-        for l in _SKIN:   m[seg==l]=255
-        for l in _NOSKIN: m[seg==l]=0
-        return cv2.resize(m,(W,H),cv2.INTER_NEAREST).astype(np.float32)/255.
+
+        m_skin = np.zeros((512,512),np.uint8)
+        for l in _SKIN:   m_skin[seg==l]=255
+        for l in _NOSKIN: m_skin[seg==l]=0
+
+        m_pure = np.zeros((512,512),np.uint8)
+        m_pure[seg==1] = 255
+
+        return {
+            "skin": cv2.resize(m_skin,(W,H),cv2.INTER_NEAREST).astype(np.float32)/255.,
+            "pure": cv2.resize(m_pure,(W,H),cv2.INTER_NEAREST).astype(np.float32)/255.,
+        }
 
     def _hsv(self, face: np.ndarray) -> np.ndarray:
         hsv = cv2.cvtColor(face,cv2.COLOR_BGR2HSV)
@@ -133,115 +148,180 @@ class FaceParser:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CORE: Frequency Separation
+# легаси FS + blemish (выкл — на CodeFormer)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def fs(ch: np.ndarray, r: int):
-    """Возвращает (low, high). low=blur, high=ch-low."""
-    k = r*2+1
-    low = cv2.GaussianBlur(ch.astype(np.float32),(k,k),r/2.)
-    return low, ch.astype(np.float32)-low
-
-
-def recombine(low: np.ndarray, high: np.ndarray) -> np.ndarray:
-    return np.clip(low+high, 0, 255)
+# def fs(ch: np.ndarray, r: int):
+#     """Возвращает (low, high). low=blur, high=ch-low."""
+#     k = r*2+1
+#     low = cv2.GaussianBlur(ch.astype(np.float32),(k,k),r/2.)
+#     return low, ch.astype(np.float32)-low
+#
+#
+# def recombine(low: np.ndarray, high: np.ndarray) -> np.ndarray:
+#     return np.clip(low+high, 0, 255)
+#
+#
+# def blemish_inpaint(face: np.ndarray, skin_pure: np.ndarray,
+#                     strength: float = BLEMISH_STR) -> np.ndarray:
+#     if strength <= 0:
+#         return face
+#     H, W = face.shape[:2]
+#     erode_k = max(5, int(min(H, W) * 0.015))
+#     if erode_k % 2 == 0: erode_k += 1
+#     skin_safe = erode(skin_pure, k=erode_k, n=1)
+#     if skin_safe.sum() < 200:
+#         return face
+#     r = max(21, int(min(H, W) * 0.04))
+#     if r % 2 == 0: r += 1
+#     lab = cv2.cvtColor(face, cv2.COLOR_BGR2Lab).astype(np.float32)
+#     L, a = lab[:, :, 0], lab[:, :, 1]
+#     L_diff = cv2.GaussianBlur(L, (r, r), 0) - L
+#     a_diff = a - cv2.GaussianBlur(a, (r, r), 0)
+#     score = np.minimum(L_diff, a_diff * 1.5) * 2.0
+#     sp = score[skin_safe > 0.5]
+#     if len(sp) < 100:
+#         return face
+#     pct = 100 - 3 * strength
+#     thr = max(np.percentile(sp, pct), 5.0)
+#     raw = ((score > thr) & (skin_safe > 0.5)).astype(np.uint8) * 255
+#     raw = cv2.morphologyEx(raw, cv2.MORPH_OPEN,
+#                            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+#     n_lab, lbl, stats, _ = cv2.connectedComponentsWithStats(raw, connectivity=8)
+#     mask = np.zeros_like(raw)
+#     min_area = 18
+#     max_area = int(min(H, W) * 0.04) ** 2
+#     kept = 0
+#     for i in range(1, n_lab):
+#         x, y, w, h, area = stats[i]
+#         if area < min_area or area > max_area:
+#             continue
+#         if max(w, h) / max(1, min(w, h)) > 2.5:
+#             continue
+#         if area / (w * h + 1) < 0.4:
+#             continue
+#         mask[lbl == i] = 255
+#         kept += 1
+#     mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)), iterations=1)
+#     n = int(mask.sum() / 255)
+#     mx = int(H * W * BLEMISH_PCT)
+#     if n == 0 or n > mx:
+#         if n > mx: logger.info("Blemish %d>%d skip", n, mx)
+#         return face
+#     inpaint_r = max(1, int(round(4 * strength)))
+#     out = cv2.inpaint(face, mask, inpaintRadius=inpaint_r, flags=cv2.INPAINT_NS)
+#     logger.info("Blemish: %d blobs, %d px (str=%.2f, pct=%.1f, r=%d)",
+#                 kept, n, strength, pct, inpaint_r)
+#     return out
+#
+#
+# def fs_retouch(face: np.ndarray, skin_soft: np.ndarray,
+#                tone_str: float = TONE_STR,
+#                db_str: float = DB_STR,
+#                micro_str: float = MICRO_STR) -> np.ndarray:
+#     """Photoshop Frequency Separation — закомментировано при переходе на CodeFormer."""
+#     H, W = face.shape[:2]
+#     m = skin_soft > 0.25
+#     if m.sum() < 200:
+#         return face
+#     r_tone = max(25, int(min(H,W) * 0.05))
+#     r_db   = max(35, int(min(H,W) * 0.07))
+#     r_mid  = max(15, int(min(H,W) * 0.03))
+#     r_micro= max(5,  int(min(H,W) * 0.012))
+#     for r in [r_tone, r_db, r_mid, r_micro]:
+#         if r % 2 == 0: r += 1
+#     lab = cv2.cvtColor(face, cv2.COLOR_BGR2Lab).astype(np.float32)
+#     a_low, a_high = fs(lab[:,:,1], r_tone)
+#     a_mean = float(a_low[m].mean())
+#     a_low_new = a_low + (a_mean - a_low) * skin_soft * tone_str
+#     lab[:,:,1] = np.clip(recombine(a_low_new, a_high), 0, 255)
+#     b_low, b_high = fs(lab[:,:,2], r_tone)
+#     b_mean = float(b_low[m].mean())
+#     b_low_new = b_low + (b_mean - b_low) * skin_soft * tone_str * 0.35
+#     lab[:,:,2] = np.clip(recombine(b_low_new, b_high), 0, 255)
+#     L = lab[:,:,0]
+#     L_low_c, L_high_c = fs(L, r_db)
+#     L_mean_c = float(L_low_c[m].mean())
+#     L_low_c_new = L_low_c + (L_mean_c - L_low_c) * skin_soft * db_str
+#     L_low_m, _ = fs(L, r_mid)
+#     L_mean_m = float(L_low_m[m].mean())
+#     L_low_m_new = L_low_m + (L_mean_m - L_low_m) * skin_soft * db_str * 0.42
+#     L_result = L_low_c_new + (L_low_m_new - L_low_m) + L_high_c
+#     lab[:,:,0] = np.clip(L_result, 0, 255)
+#     r_mc = r_micro if r_micro % 2 == 1 else r_micro + 1
+#     L_cur = lab[:,:,0]
+#     L_blur = cv2.GaussianBlur(L_cur, (r_mc*2+1, r_mc*2+1), r_mc/2.)
+#     lab[:,:,0] = np.clip(L_cur + (L_cur - L_blur) * skin_soft * micro_str, 0, 255)
+#     return cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_Lab2BGR)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 1: Blemish inpaint
+# Face Restorer
 # ══════════════════════════════════════════════════════════════════════════════
 
-def blemish_inpaint(face: np.ndarray, skin: np.ndarray) -> np.ndarray:
-    H,W = face.shape[:2]
-    mx = int(H*W*BLEMISH_PCT)
-    r = max(21, int(min(H,W)*.04))
-    if r%2==0: r+=1
-    L = cv2.cvtColor(face,cv2.COLOR_BGR2Lab)[:,:,0].astype(np.float32)
-    diff = np.abs(L - cv2.GaussianBlur(L,(r,r),0))
-    sp = diff[skin>.5]
-    if len(sp)<100: return face
-    thr = max(np.percentile(sp,90), 10.)
-    m = ((diff>thr)&(skin>.5)).astype(np.uint8)*255
-    m = cv2.morphologyEx(m,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)))
-    m = cv2.dilate(m,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5)),iterations=1)
-    n = int(m.sum()/255)
-    if n==0 or n>mx:
-        if n>mx: logger.info("Blemish %d>%d skip",n,mx)
-        return face
-    r_ = cv2.inpaint(face,m,inpaintRadius=4,flags=cv2.INPAINT_TELEA)
-    logger.info("Blemish: %d px",n)
-    return r_
+class FaceRestorer:
+    def __init__(self):
+        self._infer = None
+        try:
+            from codeformer.app import inference_app
+            self._infer = inference_app
+            logger.info("FaceRestorer: CodeFormer (codeformer-pip)")
+        except Exception as e:
+            logger.error("CodeFormer недоступен: %s", e)
 
+    def restore(self, face_bgr: np.ndarray,
+                fidelity: float = 0.5,
+                background_enhance: bool = False,
+                face_upsample: bool = False,
+                upscale: int = 1) -> np.ndarray:
+        if self._infer is None:
+            return face_bgr
+        H, W = face_bgr.shape[:2]
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 2-5: Frequency Separation Retouch
-# ══════════════════════════════════════════════════════════════════════════════
+        # codeformer-pip принимает только путь к файлу
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tf:
+            tmp_in = tf.name
+        tmp_out = None
+        try:
+            cv2.imwrite(tmp_in, face_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+            logger.info("CodeFormer in: %dx%d, fidelity=%.2f bg=%s up=%s scale=%d",
+                        W, H, fidelity, background_enhance, face_upsample, upscale)
+            result = self._infer(
+                image=tmp_in,
+                background_enhance=bool(background_enhance),
+                face_upsample=bool(face_upsample),
+                upscale=int(upscale),
+                codeformer_fidelity=float(fidelity),
+            )
+            if result is None:
+                logger.warning("CodeFormer вернул None")
+                return face_bgr
 
-def fs_retouch(face: np.ndarray, skin_soft: np.ndarray) -> np.ndarray:
-    """
-    ГЛАВНАЯ ФУНКЦИЯ — Photoshop Frequency Separation:
+            # вернёт либо путь либо ndarray
+            if isinstance(result, str):
+                tmp_out = result
+                result_bgr = cv2.imread(result)
+            elif isinstance(result, np.ndarray):
+                result_bgr = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
+            else:
+                logger.warning("CodeFormer вернул неожиданный тип: %s", type(result))
+                return face_bgr
 
-    1. Разделяем на LOW + HIGH
-    2. Корректируем LOW:
-       - STEP 2: Tone/Color correction (убираем покраснения, a-channel)
-       - STEP 3: Luminosity leveling (Dodge & Burn, L-channel)
-       - STEP 4: Micro-contrast boost
-    3. HIGH остаётся нетронутым
-    4. final = LOW_corrected + HIGH
-    """
-    H, W = face.shape[:2]
-    m = skin_soft > 0.25
-    if m.sum() < 200:
-        return face
+            if result_bgr is None:
+                logger.warning("Не смог прочитать результат CodeFormer")
+                return face_bgr
 
-    # Радиусы под разрешение изображения
-    r_tone = max(45, int(min(H,W) * 0.09))   # для цвета/тона
-    r_db   = max(55, int(min(H,W) * 0.11))   # для D&B яркости
-    r_mid  = max(25, int(min(H,W) * 0.05))   # для mid-tone D&B
-    r_micro= max(7,  int(min(H,W) * 0.014))  # для micro-contrast
-
-    for r in [r_tone, r_db, r_mid, r_micro]:
-        if r % 2 == 0: r += 1
-
-    lab = cv2.cvtColor(face, cv2.COLOR_BGR2Lab).astype(np.float32)
-
-    # ── STEP 2: Tone/Color correction ─────────────────────────────────────
-    # a-канал: покраснения
-    a_low, a_high = fs(lab[:,:,1], r_tone)
-    a_mean = float(a_low[m].mean())
-    a_low_new = a_low + (a_mean - a_low) * skin_soft * TONE_STR
-    lab[:,:,1] = np.clip(recombine(a_low_new, a_high), 0, 255)
-
-    # b-канал: жёлтый/синий тон (слабее)
-    b_low, b_high = fs(lab[:,:,2], r_tone)
-    b_mean = float(b_low[m].mean())
-    b_low_new = b_low + (b_mean - b_low) * skin_soft * TONE_STR * 0.35
-    lab[:,:,2] = np.clip(recombine(b_low_new, b_high), 0, 255)
-
-    # ── STEP 3: Dodge & Burn (L-channel) ──────────────────────────────────
-    L = lab[:,:,0]
-
-    # Coarse D&B — крупные зоны
-    L_low_c, L_high_c = fs(L, r_db)
-    L_mean_c = float(L_low_c[m].mean())
-    L_low_c_new = L_low_c + (L_mean_c - L_low_c) * skin_soft * DB_STR
-
-    # Mid D&B — средние неровности
-    L_low_m, _ = fs(L, r_mid)
-    L_mean_m = float(L_low_m[m].mean())
-    L_low_m_new = L_low_m + (L_mean_m - L_low_m) * skin_soft * DB_STR * 0.42
-
-    # HIGH_FREQ нетронут — рекомбинируем
-    L_result = L_low_c_new + (L_low_m_new - L_low_m) + L_high_c
-    lab[:,:,0] = np.clip(L_result, 0, 255)
-
-    # ── STEP 4: Micro-contrast boost ──────────────────────────────────────
-    r_mc = r_micro if r_micro % 2 == 1 else r_micro + 1
-    L_cur = lab[:,:,0]
-    L_blur = cv2.GaussianBlur(L_cur, (r_mc*2+1, r_mc*2+1), r_mc/2.)
-    lab[:,:,0] = np.clip(L_cur + (L_cur - L_blur) * skin_soft * MICRO_STR, 0, 255)
-
-    return cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_Lab2BGR)
+            logger.info("CodeFormer out: %dx%d", result_bgr.shape[1], result_bgr.shape[0])
+            if result_bgr.shape[:2] != (H, W):
+                result_bgr = cv2.resize(result_bgr, (W, H), interpolation=cv2.INTER_LINEAR)
+            return result_bgr
+        except Exception as e:
+            logger.exception("CodeFormer restore failed: %s", e)
+            return face_bgr
+        finally:
+            Path(tmp_in).unlink(missing_ok=True)
+            if tmp_out and Path(tmp_out).exists():
+                Path(tmp_out).unlink(missing_ok=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -277,18 +357,25 @@ def _scale_up(img: np.ndarray, orig_H: int, orig_W: int):
 
 class RetouchPipeline:
     def __init__(self):
-        self.detector: Optional[FaceDetector] = None
-        self.parser:   Optional[FaceParser]   = None
+        self.detector: Optional[FaceDetector]  = None
+        self.parser:   Optional[FaceParser]    = None
+        self.restorer: Optional[FaceRestorer]  = None
 
     def load_models(self):
         logger.info("Loading FaceDetector…")
         self.detector = FaceDetector()
         logger.info("Loading FaceParser…")
         self.parser = FaceParser()
-        logger.info("Pipeline v9 | tone=%.2f db=%.2f micro=%.2f blemish=%.0f%% max_px=%d",
-                    TONE_STR, DB_STR, MICRO_STR, BLEMISH_PCT*100, MAX_PROC_SIZE)
+        logger.info("Loading FaceRestorer (CodeFormer)…")
+        self.restorer = FaceRestorer()
+        logger.info("Pipeline v10 (CodeFormer) | fidelity=%.2f max_px=%d",
+                    FIDELITY, MAX_PROC_SIZE)
 
-    def run(self, img_bgr: np.ndarray) -> tuple[np.ndarray, dict]:
+    def run(self, img_bgr: np.ndarray,
+            fidelity: Optional[float] = None,
+            background_enhance: Optional[bool] = None,
+            face_upsample: Optional[bool] = None,
+            upscale: Optional[int] = None) -> tuple[np.ndarray, dict]:
         """
         FLIP SAFE:
         img_bgr уже в правильной ориентации (EXIF применён в decode_image).
@@ -296,12 +383,27 @@ class RetouchPipeline:
 
         SPEED:
         Детектируем на downscaled копии (max MAX_PROC_SIZE),
+
+        PARAMS:
+          fidelity            — сила восстановления CodeFormer (0..1)
+          background_enhance  — Real-ESRGAN на фон (по умолчанию False)
+          face_upsample       — апсемпл деталей лица (по умолчанию False)
+          upscale             — внутренний коэф апскейла 1/2/4 (по умолчанию 1)
         но ретушируем оригинальный кроп в полном разрешении.
         """
+        fidelity = FIDELITY if fidelity is None else fidelity
+        fidelity = max(0.0, min(1.0, float(fidelity)))
+        background_enhance = False if background_enhance is None else bool(background_enhance)
+        face_upsample      = False if face_upsample      is None else bool(face_upsample)
+        upscale            = 1     if upscale            is None else int(upscale)
+
         t0 = time.time()
         origH, origW = img_bgr.shape[:2]
         result = img_bgr.copy()
-        stats = {"faces": 0, "tone": TONE_STR, "db": DB_STR}
+        stats = {"faces": 0, "fidelity": fidelity,
+                 "bg_enhance": background_enhance,
+                 "face_upsample": face_upsample,
+                 "upscale": upscale}
 
         # Детектируем на уменьшенной копии (быстрее)
         det_img, scale = _scale_down(img_bgr, MAX_PROC_SIZE)
@@ -336,17 +438,20 @@ class RetouchPipeline:
                     r=max(8, int(min(fH,fW)*0.012))
                 )
 
-                # Blemish inpaint (точечно)
-                proc = blemish_inpaint(face_crop, skin_strict)
-
-                # Frequency Separation Retouch (главное)
-                proc = fs_retouch(proc, skin_soft)
+                # гоняем CodeFormer
+                proc = self.restorer.restore(
+                    face_crop, fidelity,
+                    background_enhance=background_enhance,
+                    face_upsample=face_upsample,
+                    upscale=upscale,
+                )
 
                 # Composite — бесшовная вставка в оригинал
                 pad_px = max(20, int(min(fH,fW)*0.06))
-                comp = np.zeros((fH,fW), np.float32)
-                comp[pad_px:-pad_px, pad_px:-pad_px] = 1.0
-                comp = feather(comp, r=pad_px)
+                edge = np.zeros((fH,fW), np.float32)
+                edge[pad_px:-pad_px, pad_px:-pad_px] = 1.0
+                edge = feather(edge, r=pad_px)
+                comp = skin_soft * edge
 
                 # Вставляем по ТЕМ ЖЕ координатам — нет flip
                 result[y1:y2, x1:x2] = blend(proc, face_crop, comp)
