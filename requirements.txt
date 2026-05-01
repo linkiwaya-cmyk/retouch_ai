@@ -1,34 +1,33 @@
---extra-index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://download.pytorch.org/whl/cu121
 torch
+torchvision
 
 fastapi
 uvicorn[standard]
 python-multipart
+
 opencv-python-headless
+opencv-contrib-python-headless  # для GuidedFilter (ximgproc)
 numpy
 Pillow>=10.0.0
 
-# ── iPhone (HEIC/HEIF) ─────────────────────────────────────────────────────────
-pillow-heif>=0.16.0        # HEIC/HEIF decode (основной)
-pyheif                      # fallback для старых HEIC файлов
+# ── Ключевая зависимость — MediaPipe ──────────────────────────────────────────
+mediapipe>=0.10.0              # Face Mesh + Selfie Segmentation
 
-# ── EXIF / метаданные ─────────────────────────────────────────────────────────
-piexif                      # чтение/запись EXIF (ориентация)
-exifread                    # дополнительный парсер EXIF
+# ── iPhone / HEIC ─────────────────────────────────────────────────────────────
+pillow-heif>=0.16.0
+piexif
 
-# ── Android (WebP, JPEG, PNG) ─────────────────────────────────────────────────
-# Pillow>=10 уже поддерживает WebP, JPEG, PNG нативно
-# opencv-python-headless поддерживает все основные форматы Android
-
-# ── Face detection & parsing ──────────────────────────────────────────────────
+# ── Face detection (fallback) ─────────────────────────────────────────────────
 insightface
 facexlib
-onnxruntime-gpu             # GPU (если нет GPU — заменить на onnxruntime)
-
-# ── AI retouch ────────────────────────────────────────────────────────────────
-codeformer-pip
+onnxruntime-gpu                # замени на onnxruntime если нет GPU
 
 # ── Bot ───────────────────────────────────────────────────────────────────────
 aiogram>=3.7.0
 aiohttp
 python-dotenv
+
+# ── Опционально ───────────────────────────────────────────────────────────────
+# gfpgan                       # GFPGAN face retouch (если захочешь добавить)
+# scikit-image                 # дополнительные алгоритмы
