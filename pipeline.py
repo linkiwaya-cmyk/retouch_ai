@@ -49,7 +49,7 @@ MAX_PROC_SIZE = int(os.environ.get("MAX_PROC_SIZE", "2048"))
 _PRESETS = {
     "light":  dict(smooth=0.45, tone=0.50, db=0.40, redness=0.60, warmth=0.25),
     "medium": dict(smooth=0.60, tone=0.65, db=0.52, redness=0.72, warmth=0.30),
-    "strong": dict(smooth=0.75, tone=0.80, db=0.65, redness=0.85, warmth=0.38),
+    "strong": dict(smooth=0.75, tone=0.55, db=0.65, redness=0.85, warmth=0.38),
 }
 _style    = os.environ.get("RETOUCH_STYLE",    "beauty")
 _strength = os.environ.get("RETOUCH_STRENGTH", "strong")
@@ -63,8 +63,8 @@ WARMTH_STRENGTH     = float(os.environ.get("WARMTH_STRENGTH",      _p["warmth"])
 MOLE_PROTECTION     = float(os.environ.get("MOLE_PROTECTION_STRENGTH", "0.92"))
 
 # BiSeNet labels
-_SKIN   = {1, 7, 8}
-_NOSKIN = {2,3,4,5,6,9,10,11,12,13,14,15,16,17,18}
+_SKIN   = {1, 7, 8, 10, 14}
+_NOSKIN = {2, 3, 4, 5, 6, 9, 11, 12, 13, 15, 16, 17, 18}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -263,7 +263,8 @@ def even_tone(face: np.ndarray, skin_soft: np.ndarray, moles: np.ndarray) -> np.
     eff = skin_soft * (1. - moles * MOLE_PROTECTION)
 
     H,W = face.shape[:2]
-    r = max(51, int(min(H,W)*0.11)); r += r%2==0
+    # Очень большой радиус — только глобальное выравнивание, без локальных пятен
+    r = max(81, int(min(H,W)*0.18)); r += r%2==0
 
     # Low-freq яркости (крупные зоны)
     k = r*2+1
@@ -414,68 +415,114 @@ class RetouchPipeline:
         stats["t_detect"] = round(time.time()-td, 2)
 
         if not faces:
-            logger.info("No faces detected")
+            logger.info("No faces — skipped")
             return result, stats
 
         tr = time.time()
+
+        # ══════════════════════════════════════════════════════════════════
+        # PASS 1: Обработка лица через BiSeNet (точная маска)
+        # ══════════════════════════════════════════════════════════════════
         for fi in faces:
             bx = [int(v/scale) for v in fi["bbox"]]
-            x1,y1,x2,y2 = _pad(bx, origH, origW)
+            x1,y1,x2,y2 = _pad(bx, origH, origW, pad=0.32)
             crop = ucrop(img_bgr, x1, y1, x2, y2)
             if crop.size == 0: continue
 
             fH, fW = crop.shape[:2]
-            logger.info("Face: %dx%d", fW, fH)
+            logger.info("Face crop: %dx%d at [%d,%d,%d,%d]", fW,fH,x1,y1,x2,y2)
 
             try:
-                # ── Masks ─────────────────────────────────────────────────
                 ts = time.time()
                 skin_raw    = self.parser.skin_mask(crop)
                 skin_strict = erode(skin_raw, k=3, n=1)
                 skin_soft   = feather(dilate(skin_strict, k=5, n=1),
                                       r=max(8, int(min(fH,fW)*0.012)))
                 mm = mole_mask(crop, skin_strict)
-                logger.info("Masks: %.2fs", time.time()-ts)
+                logger.info("Face masks: %.2fs", time.time()-ts)
 
-                # ── Retouch steps ─────────────────────────────────────────
                 proc = crop.copy()
-
-                # 1. Blemish removal
-                proc = remove_blemishes(proc, skin_strict, mm)
-
-                # 2. Redness removal
-                t1 = time.time()
                 proc = remove_redness(proc, skin_soft, mm)
-                logger.info("Redness: %.2fs", time.time()-t1)
-
-                # 3. Tone evening
-                t1 = time.time()
                 proc = even_tone(proc, skin_soft, mm)
-                logger.info("Tone: %.2fs", time.time()-t1)
-
-                # 4. Skin smoothing (frequency separation)
-                t1 = time.time()
                 proc = smooth_skin(proc, skin_soft, mm)
-                logger.info("Smooth: %.2fs", time.time()-t1)
-
-                # 5. Dodge & Burn
-                t1 = time.time()
                 proc = dodge_burn(proc, skin_soft, mm)
-                logger.info("D&B: %.2fs", time.time()-t1)
-
-                # 6. Warmth
                 proc = add_warmth(proc, skin_soft, mm)
 
-                # ── Composite ─────────────────────────────────────────────
                 pad_px = max(20, int(min(fH,fW)*0.06))
                 comp = np.zeros((fH,fW), np.float32)
                 comp[pad_px:-pad_px, pad_px:-pad_px] = 1.0
                 comp = feather(comp, r=pad_px)
-
                 result[y1:y2, x1:x2] = blend(proc, crop, comp)
 
             except Exception as e:
                 logger.exception("Face error: %s", e)
+
+        # ══════════════════════════════════════════════════════════════════
+        # PASS 2: Обработка ТЕЛА (шея, руки, плечи, грудь)
+        # HSV skin mask на всём изображении, исключаем уже обработанное лицо
+        # ══════════════════════════════════════════════════════════════════
+        try:
+            tb = time.time()
+            body_skin = self._body_skin_mask(result, origH, origW)
+
+            # Исключаем зону лица из body mask (уже обработана)
+            for fi in faces:
+                bx = [int(v/scale) for v in fi["bbox"]]
+                fx1,fy1,fx2,fy2 = _pad(bx, origH, origW, pad=0.15)
+                body_skin[fy1:fy2, fx1:fx2] = 0.0
+
+            # Применяем только если есть достаточно пикселей тела
+            body_px = (body_skin > 0.3).sum()
+            logger.info("Body skin: %d px (%.1f%% image)", body_px, body_px/origH/origW*100)
+
+            if body_px > 5000:
+                # Mole mask для тела
+                body_mm = mole_mask(result, (body_skin > 0.5).astype(np.float32))
+                body_soft = feather(body_skin, r=max(10, int(min(origH,origW)*0.008)))
+
+                body_proc = result.copy()
+                body_proc = remove_redness(body_proc, body_soft, body_mm)
+                body_proc = even_tone(body_proc, body_soft, body_mm)
+                body_proc = smooth_skin(body_proc, body_soft, body_mm)
+                body_proc = dodge_burn(body_proc, body_soft, body_mm)
+                body_proc = add_warmth(body_proc, body_soft, body_mm)
+
+                # Блендим тело обратно
+                result = blend(body_proc, result, body_soft)
+                logger.info("Body retouch: %.2fs", time.time()-tb)
+
+        except Exception as e:
+            logger.exception("Body retouch error: %s", e)
+
+        stats["t_retouch"] = round(time.time()-tr, 2)
+        stats["t_total"]   = round(time.time()-t0, 2)
+        logger.info("Done: faces=%d total=%.2fs", stats["faces"], stats["t_total"])
+        return result, stats
+
+    def _body_skin_mask(self, img: np.ndarray, H: int, W: int) -> np.ndarray:
+        """
+        HSV + YCrCb skin detection для тела (шея, руки, плечи).
+        Возвращает float32 [0..1] маску.
+        """
+        # HSV диапазон кожи
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        m_hsv = cv2.inRange(hsv, np.array([0,20,60]), np.array([25,170,255]))
+
+        # YCrCb диапазон кожи (более точный)
+        ycr = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
+        m_ycr = cv2.inRange(ycr, np.array([0,133,77]), np.array([255,173,127]))
+
+        # Объединяем
+        combined = cv2.bitwise_and(m_hsv, m_ycr)
+
+        # Морфология — убираем шум
+        k7 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
+        k15 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(15,15))
+        combined = cv2.morphologyEx(combined, cv2.MORPH_OPEN, k7)
+        combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, k15)
+        combined = cv2.dilate(combined, k7, iterations=2)
+
+        return combined.astype(np.float32) / 255.0
 
         stats["t_retouch"] = round(time.time()-tr, 2)
         stats["t_total"]   = round(time.time()-t0, 2)
