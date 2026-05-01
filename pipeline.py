@@ -61,6 +61,10 @@ class MediaPipeSegmenter:
         try:
             import mediapipe as mp
 
+            # Проверяем версию — solutions доступен в mediapipe >= 0.10
+            if not hasattr(mp, 'solutions'):
+                raise ImportError("mediapipe too old — pip install 'mediapipe>=0.10.0'")
+
             # Face Mesh — 468 точек лица
             self._face_mesh = mp.solutions.face_mesh.FaceMesh(
                 static_image_mode=True,
@@ -71,9 +75,18 @@ class MediaPipeSegmenter:
 
             # Selfie Segmentation — маска тела
             self._selfie_seg = mp.solutions.selfie_segmentation.SelfieSegmentation(
-                model_selection=1  # 1 = более точная модель
+                model_selection=1
             )
             logger.info("MediaPipe: Face Mesh + Selfie Segmentation loaded")
+
+        except ImportError as e:
+            logger.error("MediaPipe import error: %s", e)
+            logger.error("Fix: pip install 'mediapipe>=0.10.0'")
+        except AttributeError as e:
+            logger.error("MediaPipe attribute error (version too old?): %s", e)
+            logger.error("Fix: pip install --upgrade mediapipe")
+        except Exception as e:
+            logger.error("MediaPipe load failed: %s", e)
 
         except ImportError:
             logger.error("mediapipe not installed: pip install mediapipe")
@@ -311,37 +324,40 @@ def even_skin_tone(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
 
 def soft_smooth(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """
-    Мягкое сглаживание через BilateralFilter + Guided Filter.
-    Сохраняет текстуру и края.
-    Применяется только по маске.
+    Мягкое сглаживание через BilateralFilter + опциональный Guided Filter.
+    Сохраняет текстуру и края. Применяется только по маске.
     """
-    if SMOOTH_STRENGTH < 0.01: return img
+    if SMOOTH_STRENGTH < 0.01:
+        return img
+
+    import cv2 as _cv2  # явный импорт — исключает UnboundLocalError
+
     H, W = img.shape[:2]
+    d = max(9, int(min(H, W) * 0.012))
+    if d % 2 == 0:
+        d += 1
 
-    d = max(9, int(min(H,W) * 0.012))
-    if d % 2 == 0: d += 1
+    # Bilateral — сохраняет края, убирает мелкие неровности
+    smoothed = _cv2.bilateralFilter(img, d=d, sigmaColor=30, sigmaSpace=30)
 
-    # Bilateral — сохраняет края
-    smoothed = cv2.bilateralFilter(img, d=d, sigmaColor=30, sigmaSpace=30)
-
-    # Guided filter (если доступен)
+    # Guided Filter (если opencv-contrib установлен)
     try:
-        import cv2.ximgproc
-        r_gf = max(8, int(min(H,W)*0.01))
-        guide = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        import cv2.ximgproc as _ximgproc
+        r_gf  = max(8, int(min(H, W) * 0.01))
+        guide = _cv2.cvtColor(img, _cv2.COLOR_BGR2GRAY)
         for ch in range(3):
-            smoothed[:,:,ch] = cv2.ximgproc.guidedFilter(
+            smoothed[:, :, ch] = _ximgproc.guidedFilter(
                 guide=guide,
-                src=smoothed[:,:,ch],
+                src=smoothed[:, :, ch],
                 radius=r_gf,
                 eps=100,
             )
+        logger.info("Smooth: GuidedFilter applied")
     except Exception:
-        pass  # Bilateral уже достаточно
+        logger.info("Smooth: BilateralFilter only (no ximgproc)")
 
     # Blend только на коже
-    result = blend(smoothed, img, mask * SMOOTH_STRENGTH)
-    return result
+    return blend(smoothed, img, mask * SMOOTH_STRENGTH)
 
 
 def dodge_and_burn(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
