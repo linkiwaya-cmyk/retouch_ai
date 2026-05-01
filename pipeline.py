@@ -285,39 +285,52 @@ def build_protection_mask(img: np.ndarray, skin: np.ndarray) -> np.ndarray:
 def reduce_redness(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """
     Нейтрализует красноту в LAB a-канале только по маске кожи.
-    Не трогает родинки/тату (они в protect_mask уже исключены из mask).
+    Слабее применяется чтобы не менять натуральный цвет.
     """
-    if REDNESS_STRENGTH < 0.01: return img
+    if REDNESS_STRENGTH < 0.01:
+        return img
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2Lab).astype(np.float32)
-    m = mask > 0.2
-    if m.sum() < 100: return img
+    m   = mask > 0.2
+    if m.sum() < 100:
+        return img
+
     a_mean = float(lab[:,:,1][m].mean())
-    correction = (a_mean - lab[:,:,1]) * mask * REDNESS_STRENGTH
+    # Корректируем только участки которые КРАСНЕЕ среднего
+    # (не трогаем участки где a < среднего — они уже нормальные)
+    too_red   = (lab[:,:,1] - a_mean)
+    # Только положительные отклонения (краснее нормы)
+    correction = np.clip(too_red, 0, None) * mask * REDNESS_STRENGTH * (-1.)
     lab[:,:,1] = np.clip(lab[:,:,1] + correction, 0, 255)
+
     logger.info("Redness: a_mean=%.1f strength=%.2f", a_mean, REDNESS_STRENGTH)
     return cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_Lab2BGR)
 
 
 def even_skin_tone(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """
-    Выравнивает тон кожи через CLAHE на L-канале + плавное выравнивание.
-    Применяется ТОЛЬКО по маске кожи.
+    Выравнивает тон кожи через плавное выравнивание L-канала.
+    НЕ используем CLAHE — он меняет цвет глобально.
+    Используем frequency separation: сдвигаем low-freq к среднему.
     """
-    if TONE_STRENGTH < 0.01: return img
+    if TONE_STRENGTH < 0.01:
+        return img
     H, W = img.shape[:2]
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2Lab).astype(np.float32)
-    L = lab[:,:,0]
-    m = mask > 0.2
-    if m.sum() < 100: return img
+    L   = lab[:,:,0]
+    m   = mask > 0.2
+    if m.sum() < 100:
+        return img
 
-    # CLAHE с малым clip limit — мягкое выравнивание
-    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8,8))
-    L_u8  = np.clip(L, 0, 255).astype(np.uint8)
-    L_eq  = clahe.apply(L_u8).astype(np.float32)
+    # Большой радиус — только крупные зоны тона
+    r = max(81, int(min(H,W)*0.15)); r += r%2==0
+    k = r*2+1
+    L_low  = cv2.GaussianBlur(L, (k,k), r/2.)
+    L_high = L - L_low   # текстура — нетронута
 
-    # Применяем только на коже
-    L_new = L * (1. - mask * TONE_STRENGTH) + L_eq * (mask * TONE_STRENGTH)
-    lab[:,:,0] = np.clip(L_new, 0, 255)
+    L_mean = float(L_low[m].mean())
+    # Сдвигаем low-freq к среднему — выравниваем крупные пятна света/тени
+    correction = (L_mean - L_low) * mask * TONE_STRENGTH
+    lab[:,:,0] = np.clip(L_low + correction + L_high, 0, 255)
 
     return cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_Lab2BGR)
 
@@ -395,10 +408,11 @@ def dodge_and_burn(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
 
 
 def add_warmth(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """Лёгкий тёплый персиковый тон на коже."""
+    """Очень лёгкий тёплый тон — почти незаметный."""
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2Lab).astype(np.float32)
-    lab[:,:,2] = np.clip(lab[:,:,2] + mask * 3.5, 0, 255)  # тепло
-    lab[:,:,1] = np.clip(lab[:,:,1] - mask * 1.5, 0, 255)  # убираем чуть красноты
+    # Убираем warmth почти полностью — был слишком сильный
+    lab[:,:,2] = np.clip(lab[:,:,2] + mask * 1.2, 0, 255)  # было 3.5
+    lab[:,:,1] = np.clip(lab[:,:,1] - mask * 0.5, 0, 255)  # было 1.5
     return cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_Lab2BGR)
 
 
