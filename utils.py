@@ -152,3 +152,4 @@ def blend(src: np.ndarray, dst: np.ndarray, a: np.ndarray) -> np.ndarray:
 def crop(img: np.ndarray, x1,y1,x2,y2) -> np.ndarray:
     H,W = img.shape[:2]
     return img[max(0,y1):min(H,y2), max(0,x1):min(W,x2)]
+
