@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).parent / "retouch_lab.db"
 
-TRIAL_LIMIT = 2  # максимум бесплатных обработок
+TRIAL_LIMIT = 3  # максимум бесплатных обработок
 
 PLAN_DAYS   = {"1m": 30,  "3m": 90,  "6m": 180, "1y": 365}
 PLAN_PRICES = {"1m": 990, "3m": 2490,"6m": 4990,"1y": 8990}
@@ -69,6 +69,15 @@ async def _ensure_tables(db):
             await db.execute(sql)
         except Exception:
             pass
+    # Таблица аналитики
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_id INTEGER NOT NULL,
+            event       TEXT NOT NULL,
+            created_at  TEXT DEFAULT (datetime('now'))
+        )
+    """)
     await db.commit()
 
 
@@ -279,6 +288,49 @@ async def update_payment_status(payment_id: int, status: str):
             (status, payment_id)
         )
         await db.commit()
+
+
+async def log_analytics_event(telegram_id: int, event: str):
+    """Логирует аналитическое событие."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await _ensure_tables(db)
+        await db.execute(
+            "INSERT INTO events (telegram_id, event) VALUES (?, ?)",
+            (telegram_id, event)
+        )
+        await db.commit()
+
+
+async def get_analytics_summary() -> dict:
+    """Возвращает сводку аналитики за последние 7 дней."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        result = {}
+        for event in [
+            "photo_processed", "paywall_shown",
+            "photo_processing_started", "photo_processing_error"
+        ]:
+            async with db.execute("""
+                SELECT COUNT(*) as cnt FROM events
+                WHERE event = ?
+                AND datetime(created_at) > datetime('now', '-7 days')
+            """, (event,)) as cur:
+                row = await cur.fetchone()
+                result[event] = row["cnt"] if row else 0
+        # Конверсия
+        shown = result.get("paywall_shown", 0)
+        async with db.execute("""
+            SELECT COUNT(*) as cnt FROM payments
+            WHERE payment_status = 'approved'
+            AND datetime(created_at) > datetime('now', '-7 days')
+        """) as cur:
+            row = await cur.fetchone()
+            result["subscriptions_bought"] = row["cnt"] if row else 0
+        result["conversion_pct"] = (
+            round(result["subscriptions_bought"] / shown * 100, 1)
+            if shown > 0 else 0
+        )
+        return result
 
 
 async def update_last_active(telegram_id: int):

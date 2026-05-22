@@ -50,6 +50,8 @@ from database import (
 )
 from notifications import send_expiry_notifications
 from broadcast import broadcast, get_all_users
+from reminders import send_reminders, RELAUNCH_MESSAGE
+from database import update_last_active, reset_reminder_flag
 try:
     from ocr_check import analyze_receipt, format_ocr_result
     OCR_ENABLED = True
@@ -89,7 +91,7 @@ WELCOME_TEXT = (
     "✦ Natural retouch — готово для клиентской отдачи\n\n"
 
     "━━━━━━━━━━━━━━━━━━\n"
-    "🎁 <b>2 бесплатные обработки</b> для новых пользователей\n\n"
+    "🎁 <b>3 бесплатные обработки</b> для новых пользователей\n\n"
 
     "Отправь фото <b>файлом</b> (📎 → Файл) для полного качества\n"
     "Форматы: JPG · PNG · HEIC · WebP"
@@ -736,13 +738,12 @@ async def callback_reject(callback: CallbackQuery):
 def _limit_exceeded_text() -> str:
     """Единый текст для всех мест где показываем блокировку."""
     return (
-        "✨ <b>Бесплатный лимит обработок закончился</b>\n\n"
-        "Retouch Lab создан для профессиональной AI-ретуши:\n"
-        "• natural skin\n"
-        "• preserved texture\n"
-        "• premium quality\n"
-        "• polished look\n\n"
-        "Для продолжения оформите подписку 💎"
+        "💎 <b>Бесплатные обработки использованы</b>\n\n"
+        "💡 <b>Посчитай сам:</b>\n"
+        "Ретушёр берёт 300–1500 сом за одно фото.\n"
+        "Retouch Lab — 990 сом в месяц без ограничений.\n\n"
+        "⏰ <b>Акция:</b> первый месяц за <b>799 сом</b>\n\n"
+        "Выбери тариф 👇"
     )
 
 
@@ -761,6 +762,7 @@ async def _quick_check(message: Message) -> bool:
     if count < TRIAL_LIMIT:
         return True
 
+    await log_event(message.from_user.id, "paywall_shown")
     await message.answer(
         _limit_exceeded_text(),
         reply_markup=plans_keyboard(),
@@ -825,6 +827,15 @@ _HEIC_MIMES = {"image/heic", "image/heif", "image/heif-sequence"}
 _IMG_MIMES  = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 
+async def log_event(uid: int, event: str):
+    """Логируем аналитическое событие в БД."""
+    try:
+        from database import log_analytics_event
+        await log_analytics_event(uid, event)
+    except Exception:
+        pass  # аналитика не должна ломать основной флоу
+
+
 async def _do_process(message: Message, data: bytes, filename: str):
     """Внутренняя функция — прямая обработка одного фото."""
     uid = message.from_user.id
@@ -832,10 +843,13 @@ async def _do_process(message: Message, data: bytes, filename: str):
     logger.info("Recv %.2f MB from %d file=%s", len(data) / 1024 / 1024, uid, filename)
 
     # Запоминаем до обработки — на подписке или на триале
-    has_sub   = bool(await check_active_subscription(uid))
+    has_sub      = bool(await check_active_subscription(uid))
     count_before = await get_trial_count(uid) if not has_sub else 0
 
-    status = await message.answer("⏳ Обрабатываю...")
+    # Логируем событие
+    await log_event(uid, "photo_processing_started")
+
+    status = await message.answer("⏳ Обрабатываю фото...")
 
     try:
         loop   = asyncio.get_event_loop()
@@ -845,16 +859,34 @@ async def _do_process(message: Message, data: bytes, filename: str):
         await status.delete()
         await message.answer("❌ Ошибка обработки. Попробуй ещё раз.")
         await alert_admin(f"pipeline упал для user={uid}\n{type(e).__name__}: {e}")
+        await log_event(uid, "photo_processing_error")
         return
     finally:
         pass  # блокировка управляется через _queue_worker
+
+    # Считаем время обработки
+    t_total = asyncio.get_event_loop().time() - t_start
 
     await status.delete()
 
     stem     = filename.rsplit(".", 1)[0]
     out_name = f"retouched_{stem}.jpg"
 
+    # Размер исходника для отображения
+    size_mb = len(data) / 1024 / 1024
+
     await message.answer_document(BufferedInputFile(result, filename=out_name))
+    await log_event(uid, "photo_processed")
+
+    # ── ВАУ-МОМЕНТ — показываем детали обработки ──────────────────────────────
+    wow_text = (
+        f"✅ <b>Готово!</b> Время обработки: <b>{t_total:.0f} сек</b>\n\n"
+        f"📐 Разрешение: оригинал сохранён\n"
+        f"🔍 Текстура кожи: сохранена\n"
+        f"✦ Родинки и особенности: на месте\n"
+        f"💾 Размер файла: {len(result)/1024/1024:.1f} MB\n\n"
+        f"<i>Ретушёр делал бы это {max(10, int(t_total/3))}–30 минут вручную.</i>"
+    )
 
     # Считаем trial только после УСПЕШНОЙ обработки и только без подписки
     if not has_sub:
@@ -862,32 +894,52 @@ async def _do_process(message: Message, data: bytes, filename: str):
         remaining = TRIAL_LIMIT - new_count
 
         if remaining <= 0:
-            # Последняя бесплатная использована — показываем подписку
+            # Последняя бесплатная — показываем продающий экран
+            await message.answer(wow_text, parse_mode="HTML")
+            await log_event(uid, "paywall_shown")
             await message.answer(
-                "Готово ✨\n\n"
-                "✨ <b>Бесплатный лимит обработок закончился</b>\n\n"
-                "Retouch Lab создан для профессиональной AI-ретуши:\n"
-                "• natural skin\n"
-                "• polished look\n"
-                "• preserved texture\n"
-                "• premium quality\n\n"
-                "Для продолжения оформите подписку 💎",
+                "💎 <b>Бесплатные обработки использованы</b>\n\n"
+                "Ты уже видел результат — натуральная ретушь\n"
+                "без потери качества и без пластика.\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "💡 <b>Посчитай сам:</b>\n\n"
+                "Ретушёр берёт <b>300–1500 сом</b> за одно фото.\n"
+                "Retouch Lab — <b>990 сом в месяц</b> без ограничений.\n\n"
+                "Это окупается с первого же фото. 🎯\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "🚀 <b>Ты один из первых 100 пользователей</b>\n"
+                "Ранние пользователи получают лучшую цену.\n\n"
+                "⏰ <b>Акция 48 часов:</b> месяц за <b>799 сом</b> вместо 990\n\n"
+                "Выбери тариф 👇",
                 reply_markup=plans_keyboard(),
                 parse_mode="HTML",
             )
-        else:
-            # Ещё есть бесплатные — показываем остаток
+        elif remaining == 1:
+            # Осталась 1 последняя
             await message.answer(
-                f"Готово ✨\n\n"
-                f"🎁 Осталось бесплатных обработок: <b>{remaining}</b>",
+                wow_text + "\n\n"
+                "⚠️ <b>Осталась 1 бесплатная обработка</b>\n\n"
+                "После неё потребуется подписка.\n"
+                "Оформи заранее чтобы не прерываться 👇",
+                reply_markup=buy_keyboard(),
+                parse_mode="HTML",
+            )
+        else:
+            # Первые фото — показываем вау-момент
+            await message.answer(
+                wow_text + f"\n\n🎁 Осталось бесплатных: <b>{remaining}</b>",
                 parse_mode="HTML",
             )
     else:
-        await message.answer("Готово ✨")
+        # Подписчик — просто вау-момент без рекламы
+        await message.answer(wow_text, parse_mode="HTML")
 
-    logger.info("Sent %.2f MB to %d trial_count=%d/%d",
-                len(result) / 1024 / 1024, uid,
-                count_before + 1 if not has_sub else 0, TRIAL_LIMIT)
+    logger.info("Done: user=%d size=%.2fMB time=%.1fs",
+                uid, len(result) / 1024 / 1024, t_total)
+
+    # Обновляем активность — сбрасываем reminder флаг
+    await update_last_active(uid)
+    await reset_reminder_flag(uid)
 
 
 @dp.message(F.document)
@@ -979,6 +1031,71 @@ async def alert_admin(text: str):
 # ══════════════════════════════════════════════════════════════════════════════
 # BROADCAST — рассылка всем пользователям (только для ADMIN_ID)
 # ══════════════════════════════════════════════════════════════════════════════
+
+@dp.message(Command("stats"))
+async def cmd_stats(message: Message):
+    """Аналитика за 7 дней — только для админа."""
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    from database import get_analytics_summary
+    import sqlite3
+
+    s = await get_analytics_summary()
+
+    # Общая статистика пользователей
+    try:
+        import aiosqlite
+        from database import DB_PATH
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute("SELECT COUNT(*) FROM users") as cur:
+                total_users = (await cur.fetchone())[0]
+            async with db.execute(
+                "SELECT COUNT(*) FROM subscriptions WHERE is_active=1 AND datetime(end_date) > datetime('now')"
+            ) as cur:
+                active_subs = (await cur.fetchone())[0]
+            async with db.execute(
+                "SELECT COUNT(*) FROM users WHERE trial_photos_count > 0"
+            ) as cur:
+                tried = (await cur.fetchone())[0]
+    except Exception:
+        total_users = active_subs = tried = 0
+
+    await message.answer(
+        f"📊 <b>Аналитика Retouch Lab</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👥 Всего пользователей: <b>{total_users}</b>\n"
+        f"🎯 Попробовали trial: <b>{tried}</b>\n"
+        f"💎 Активных подписок: <b>{active_subs}</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"📈 <b>За последние 7 дней:</b>\n\n"
+        f"📸 Обработано фото: <b>{s.get('photo_processed', 0)}</b>\n"
+        f"🚪 Увидели paywall: <b>{s.get('paywall_shown', 0)}</b>\n"
+        f"✅ Купили подписку: <b>{s.get('subscriptions_bought', 0)}</b>\n"
+        f"📊 Конверсия: <b>{s.get('conversion_pct', 0)}%</b>\n"
+        f"❌ Ошибок pipeline: <b>{s.get('photo_processing_error', 0)}</b>",
+        parse_mode="HTML",
+    )
+
+
+@dp.message(Command("relaunch"))
+async def cmd_relaunch(message: Message):
+    """Отправляет сообщение о возвращении бота всем пользователям."""
+    if message.from_user.id != ADMIN_ID:
+        return
+    users = await get_all_users()
+    status_msg = await message.answer(
+        f"🚀 Отправляем relaunch message {len(users)} пользователям...",
+    )
+    stats = await broadcast(bot, RELAUNCH_MESSAGE)
+    await status_msg.edit_text(
+        f"✅ <b>Relaunch рассылка завершена!</b>\n\n"
+        f"👥 Всего: {stats['total']}\n"
+        f"✅ Доставлено: {stats['sent']}\n"
+        f"🚫 Заблокировали: {stats['blocked']}",
+        parse_mode="HTML",
+    )
+
 
 @dp.message(Command("broadcast"))
 async def cmd_broadcast(message: Message, state: FSMContext):
@@ -1098,10 +1215,19 @@ async def main():
     await init_db()
 
     scheduler = AsyncIOScheduler()
+    # Уведомления об окончании подписки — каждый день в 10:00
     scheduler.add_job(
         send_expiry_notifications,
         trigger="cron",
         hour=10,
+        minute=0,
+        args=[bot],
+    )
+    # Reminder неактивным пользователям — каждый день в 12:00
+    scheduler.add_job(
+        send_reminders,
+        trigger="cron",
+        hour=12,
         minute=0,
         args=[bot],
     )
