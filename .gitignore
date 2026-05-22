@@ -1,0 +1,16 @@
+.env
+*.db
+backups/
+__pycache__/
+*.pyc
+examples_video/
+examples/
+qr_code.png
+*.log
+result.jpg
+pipeline_old.py
+codeformer_loader.py
+main.py
+utils.py
+test_api.py
+test_db.py
