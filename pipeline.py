@@ -1,6 +1,6 @@
 import requests, json, time, io, os
 from dotenv import load_dotenv
-from PIL import Image, ImageOps, ImageEnhance
+from PIL import Image, ImageOps
 import pillow_heif
 
 load_dotenv()
@@ -9,47 +9,38 @@ RETOUCH_TOKEN = os.getenv("RETOUCH4ME_TOKEN")
 BASE_URL = "https://cf-retoucher.retouch4.me/api/v1"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PRESET v6 — на основе официальной документации Retouch4me
+# КОНЦЕПЦИЯ: локальная ретушь лица и кожи
 #
-# Изменения vs v5:
-# - Skin Tone Alpha2 ВОЗВРАЩЁН (документация подтверждает что он есть!)
-#   Alpha2 у Skin Tone = второй параметр выравнивания тона
-# - Dodge Burn Alpha1 поднят до 0.95 — больше ретуши
-# - Fabric 0.30 — чуть больше сглаживания
-# - Добавлена лёгкая warmth коррекция через PIL после API
-#   (только +красный, без изменения зелёного глобально)
+# УБРАНО НАВСЕГДА:
+# - Skin Tone Alpha2 (глобальный цветовой сдвиг всего кадра)
+# - Dodge Burn Alpha2 / warmth (глобальный тёплый сдвиг)
+# - _add_warmth() (глобальная RGB коррекция)
+# - _fix_colors() (глобальная цветокоррекция)
+# - любые PIL-постобработки цвета
+#
+# ОСТАВЛЕНО:
+# - Fabric (текстура кожи)
+# - Eye Vessels / Eye Brilliance (глаза)
+# - White Teeth (зубы)
+# - Dodge Burn Alpha1 only (локальная светотень лица)
+# - Skin Tone Alpha1 only (тон кожи, не всего кадра)
+# - Portrait Volumes (объём лица)
+# - Heal (дефекты кожи)
 # ══════════════════════════════════════════════════════════════════════════════
 
+# Дефолтный пресет — Natural Retouch
 PRESET = {
     "mode": "professional",
     "tasks": [
-        # Fabric: сглаживание текстуры
-        {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.35},
-
-        # Eye Vessels: убирает красные прожилки
-        {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.9},
-
-        # Eye Brilliance: блеск глаз
-        {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.4},
-
-        # White Teeth: минимально
-        {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2, "Alpha2": 0.2},
-
-        # Dodge & Burn: основной инструмент — 95% силы
-        # Alpha2 = warmth = 0.1 (минимальный тёплый оттенок)
-        {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.95, "Alpha2": 0.0},  # warmth=0 — не трогаем губы
-
-        # Skin Tone: выравнивание тона кожи
-        # Alpha1 = сила выравнивания
-        # Alpha2 = 0.3 (мягко, без green shift)
-        {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.75, "Alpha2": 0.0},  # Alpha2=0 — не меняем тон губ
-
-        # Portrait Volumes: объём лица — мягко
-        {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.35},
+        {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.28},
+        {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
+        {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
+        {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
+        {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.0},
+        {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.7},
+        {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.25},
     ]
 }
-
-API_MAX_SIZE = 4096
 
 
 def _open_image(image_bytes: bytes) -> Image.Image:
@@ -61,51 +52,23 @@ def _open_image(image_bytes: bytes) -> Image.Image:
     return img
 
 
-def _save_jpeg(img: Image.Image, quality: int = 96) -> bytes:
+def _save_jpeg(img: Image.Image, quality: int = 100) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=quality, subsampling=0, optimize=False)
     return buf.getvalue()
 
 
-def _resize_for_api(img: Image.Image, max_size: int):
-    w, h = img.size
-    if max(w, h) <= max_size:
-        return img, 1.0
-    scale = max_size / max(w, h)
-    return img.resize((int(w * scale), int(h * scale)), Image.LANCZOS), scale
-
-
-def _add_warmth(img: Image.Image) -> Image.Image:
-    """
-    Минимальная warmth коррекция после API:
-    - чуть поднимает красный канал (+2%) для натуральности губ
-    - НЕ трогает зелёный и синий глобально
-    - лёгкое поднятие насыщенности +5%
-    """
-    import numpy as np
-    arr = np.array(img, dtype=np.float32)
-
-    # Только лёгкий warmth — +2% красного
-    arr[:, :, 0] = np.clip(arr[:, :, 0] * 1.02, 0, 255)
-
-    img_out = Image.fromarray(arr.astype(np.uint8))
-
-    # Насыщенность +5%
-    # Насыщенность не трогаем — меньше пересчётов пикселей
-    # img_out = ImageEnhance.Color(img_out).enhance(1.05)
-
-    return img_out
-
-
 def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> bytes:
+    """
+    Отправляет оригинал в API без resize.
+    Никакой постобработки цвета — возвращаем результат API как есть.
+    """
     original_img = _open_image(image_bytes)
     original_size = original_img.size
 
-    # НЕ делаем resize — API поддерживает до 250MP и 100MB
-    # Отправляем оригинал напрямую
+    # Отправляем оригинал напрямую — без resize
     api_bytes = _save_jpeg(original_img, quality=100)
     api_filename = filename.rsplit('.', 1)[0] + '.jpg'
-    was_resized = False
 
     resp = requests.post(
         f"{BASE_URL}/retoucher/start",
@@ -119,7 +82,7 @@ def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> byt
 
     task_id = data["id"]
 
-    for _ in range(150):  # до 5 минут
+    for _ in range(150):
         time.sleep(2)
         s = requests.get(
             f"{BASE_URL}/retoucher/status/{task_id}",
@@ -137,18 +100,17 @@ def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> byt
         timeout=60,
     ).content
 
+    # Открываем результат
     try:
         result_img = Image.open(io.BytesIO(result_bytes)).convert('RGB')
     except Exception:
         return result_bytes
 
-    if was_resized:
+    # Проверяем размер — если API вернул меньше, ресайзим обратно
+    if result_img.size != original_size:
         result_img = result_img.resize(original_size, Image.LANCZOS)
 
-    # _add_warmth убрана — она меняла цвет губ глобально
-    # Цвет губ теперь сохраняется как в оригинале
-
-    # quality=100, subsampling=0 — максимальное качество на выходе
+    # Никакой постобработки цвета — возвращаем как есть
     return _save_jpeg(result_img, quality=100)
 
 
