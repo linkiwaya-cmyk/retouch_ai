@@ -256,6 +256,10 @@ DEFAULT_MODE = "natural"  # режим по умолчанию
 
 # Текущий режим пользователя — хранится в памяти
 _user_mode: dict = {}  # uid → mode_key
+
+# Флаг активной акции — устанавливается через /promo
+# promo_active_until = None или datetime когда акция заканчивается
+_promo_until: float = 0.0  # unix timestamp конца акции
 # GROUP_CHAT_ID — отдельная группа куда приходят чеки с кнопками approve/reject
 # Получить: создай группу → добавь бота → напиши /start → смотри getUpdates
 GROUP_CHAT_ID  = int(os.getenv("GROUP_CHAT_ID", os.getenv("ADMIN_CHAT_ID", "532189427")))
@@ -390,8 +394,13 @@ async def cmd_start(message: Message, state: FSMContext):
     trial_used = await get_trial_count(uid)
     remaining = max(0, TRIAL_LIMIT - trial_used)
 
+    import time as _time
+    promo_active = _promo_until > _time.time()
+
     if has_sub:
         trial_btn = "✨ Обработать фото"
+    elif promo_active and not has_sub:
+        trial_btn = "🔥 Акция — 799 сом (~$9)"
     elif remaining > 0:
         trial_btn = f"🎁 Попробовать бесплатно (осталось {remaining} из {TRIAL_LIMIT})"
     else:
@@ -442,6 +451,40 @@ async def cmd_start(message: Message, state: FSMContext):
 # ══════════════════════════════════════════════════════════════════════════════
 # Меню
 # ══════════════════════════════════════════════════════════════════════════════
+
+@dp.message(F.text == "🔥 Акция — 799 сом (~$9)")
+async def menu_promo_start(message: Message, state: FSMContext):
+    """Кнопка акции в главном меню — показывает акционное предложение."""
+    import time as _time
+    if _promo_until <= _time.time():
+        await message.answer("⏰ Акция уже завершена.", reply_markup=main_menu)
+        return
+
+    promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="🔥 Купить за 799 сом (~$9)",
+            callback_data="buy_promo_1m"
+        )
+    ]])
+
+    import datetime
+    ends_at = datetime.datetime.fromtimestamp(_promo_until).strftime("%H:%M")
+
+    await message.answer(
+        "🔥 ——————————————— 🔥\n"
+        "<b>С Ч А С Т Л И В Ы Е</b>\n"
+        "<b>      Ч А С Ы</b>\n"
+        "🔥 ——————————————— 🔥\n\n"
+        "<i>Только сегодня — подписка на 1 месяц</i>\n\n"
+        f"💎 <b>799 сом</b>  <s>990 сом</s>  (~<b>$9</b> вместо $11)\n\n"
+        "✦ Неограниченная AI-ретушь\n"
+        "✦ 5 режимов обработки\n"
+        "✦ Оригинальное разрешение 4K / 24MP\n\n"
+        f"⏰ <b>Акция действует до {ends_at}</b>",
+        reply_markup=promo_buy_kb,
+        parse_mode="HTML",
+    )
+
 
 @dp.message(F.text.in_({"⬅️ Назад", "⬅️ Главное меню"}))
 async def back(message: Message, state: FSMContext):
@@ -1430,6 +1473,11 @@ async def cmd_promo(message: Message, state: FSMContext):
         "✦ 5 режимов обработки\n\n"
         "⏰ <b>Акция действует 24 часа</b>"
     )
+
+    # Устанавливаем флаг акции на 24 часа
+    import time as _time
+    global _promo_until
+    _promo_until = _time.time() + 86400  # 24 часа
 
     # Получаем только пользователей БЕЗ подписки
     from database import DB_PATH
