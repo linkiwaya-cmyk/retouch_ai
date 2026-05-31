@@ -257,6 +257,9 @@ MODES = {
 }
 
 DEFAULT_MODE = "natural"  # режим по умолчанию
+
+# Текущий режим пользователя — хранится в памяти
+_user_mode: dict = {}  # uid → mode_key
 # GROUP_CHAT_ID — отдельная группа куда приходят чеки с кнопками approve/reject
 # Получить: создай группу → добавь бота → напиши /start → смотри getUpdates
 GROUP_CHAT_ID  = int(os.getenv("GROUP_CHAT_ID", os.getenv("ADMIN_CHAT_ID", "532189427")))
