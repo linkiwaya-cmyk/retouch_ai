@@ -169,81 +169,96 @@ ADMIN_ID       = int(os.getenv("ADMIN_CHAT_ID", "532189427"))
 MODES = {
     "clean": {
         "name": "✨ Чистая кожа",
-        "desc": "Убирает прыщи и дефекты. Почти не меняет лицо — максимально натурально.",
+        "desc": (
+            "Минимальная обработка. Убирает прыщи и временные дефекты.\n"
+            "Максимально натуральный результат — текстура и родинки сохраняются."
+        ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",          "Scale": 0, "Alpha1": 0.5},
-                {"Plugin": "Eye Vessels",   "Scale": 0, "Alpha1": 0.7},
-                {"Plugin": "Fabric",        "Scale": 0, "Alpha1": 0.15},
-                {"Plugin": "Dodge Burn",    "Scale": 2, "Alpha1": 0.4,  "Alpha2": 0.0},
-                {"Plugin": "Skin Tone",     "Scale": 0, "Alpha1": 0.3},
+                {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.5},
+                {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.6},
+                {"Plugin": "Fabric",      "Scale": 0, "Alpha1": 0.12},
+                {"Plugin": "Dodge Burn",  "Scale": 2, "Alpha1": 0.35, "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",   "Scale": 0, "Alpha1": 0.25},
             ]
         }
     },
     "natural": {
         "name": "🌿 Натуральная ретушь",
-        "desc": "Основной режим. Чистит кожу, сохраняет текстуру, улучшает тон. Для каждого дня.",
+        "desc": (
+            "Основной режим для каждого дня.\n"
+            "Чистит кожу, сохраняет текстуру и поры, улучшает общий тон."
+        ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.30},
-                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.9},
-                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.4},
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.28},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.95, "Alpha2": 0.1},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.8,  "Alpha2": 0.3},
-                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.30},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.05},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.7,  "Alpha2": 0.25},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.25},
             ]
         }
     },
     "depth": {
         "name": "💫 Объём и свет",
-        "desc": "Добавляет объём лицу, усиливает светотень. Дорогой профессиональный вид.",
+        "desc": (
+            "Добавляет объём и глубину лицу.\n"
+            "Усиливает светотень — дорогой профессиональный вид без лишней ретуши."
+        ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.25},
-                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.9},
-                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.6},
-                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.2,  "Alpha2": 0.1},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.7,  "Alpha2": 0.3},
-                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.6},
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.22},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.55},
+                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.18, "Alpha2": 0.18},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.1,  "Alpha2": 0.08},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.6,  "Alpha2": 0.25},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.65},
             ]
         }
     },
     "beauty": {
         "name": "💄 Beauty Pro",
-        "desc": "Для Instagram и соцсетей. Тщательная чистка кожи, красивые глаза, профессиональный beauty-эффект.",
+        "desc": (
+            "Качественная beauty-ретушь для Instagram и соцсетей.\n"
+            "Чистая кожа, выразительные глаза, ухоженный вид — без пластика."
+        ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.4},
-                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.45},
-                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 1.0},
-                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.7},
-                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.3,  "Alpha2": 0.3},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.1,  "Alpha2": 0.15},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 1.0,  "Alpha2": 0.4},
-                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.45},
+                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.35},
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.38},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.95},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.65},
+                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.28, "Alpha2": 0.28},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.0,  "Alpha2": 0.1},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.9,  "Alpha2": 0.35},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.42},
             ]
         }
     },
     "magazine": {
         "name": "🌟 Журнальный стиль",
-        "desc": "Самая сильная обработка. Рекламный эффект, максимально чистая кожа, глянцевый результат.",
+        "desc": (
+            "Премиальный editorial-режим. Максимально чистая кожа,\n"
+            "выраженный объём и контуры — журнальный глянцевый результат."
+        ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.6},
-                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.6},
+                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.55},
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.55},
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 1.0},
-                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.85},
-                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.4,  "Alpha2": 0.4},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.35, "Alpha2": 0.2},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 1.1,  "Alpha2": 0.5},
-                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.7},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.8},
+                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.38, "Alpha2": 0.38},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.25, "Alpha2": 0.15},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 1.05, "Alpha2": 0.45},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.65},
             ]
         }
     },
@@ -325,8 +340,14 @@ modes_keyboard = ReplyKeyboardMarkup(
         [KeyboardButton(text="💫 Объём и свет")],
         [KeyboardButton(text="💄 Beauty Pro")],
         [KeyboardButton(text="🌟 Журнальный стиль")],
-        [KeyboardButton(text="📖 О режимах"), KeyboardButton(text="⬅️ Назад")],
+        [KeyboardButton(text="📖 О режимах"), KeyboardButton(text="⬅️ Главное меню")],
     ],
+    resize_keyboard=True,
+)
+
+# Клавиатура после выбора режима — "Назад к режимам"
+back_to_modes = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="⬅️ Назад к режимам")]],
     resize_keyboard=True,
 )
 
@@ -404,15 +425,38 @@ async def cmd_start(message: Message, state: FSMContext):
         parse_mode="HTML",
     )
 
+    # Промо-блок для пользователей без подписки которые уже пробовали бота
+    if not has_sub and trial_used > 0 and remaining == 0:
+        promo_kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="💎 Выбрать подписку", callback_data="open_plans")
+        ]])
+        await message.answer(
+            "✨ <b>Нужна качественная ретушь?</b>\n\n"
+            "Retouch Lab — AI-ретушь прямо в Telegram:\n"
+            "натуральная кожа, сохранение качества, быстрый результат.\n\n"
+            "💎 от <b>990 сом/месяц</b> — без ограничений",
+            reply_markup=promo_kb,
+            parse_mode="HTML",
+        )
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Меню
 # ══════════════════════════════════════════════════════════════════════════════
 
-@dp.message(F.text == "⬅️ Назад")
+@dp.message(F.text.in_({"⬅️ Назад", "⬅️ Главное меню"}))
 async def back(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("Главное меню 👇", reply_markup=main_menu)
+
+
+@dp.message(F.text == "⬅️ Назад к режимам")
+async def back_to_modes_handler(message: Message, state: FSMContext):
+    """Возврат к списку режимов — НЕ в главное меню."""
+    await message.answer(
+        "Выберите режим обработки 👇",
+        reply_markup=modes_keyboard,
+    )
 
 
 @dp.message(F.text == "ℹ️ О боте")
@@ -595,7 +639,7 @@ async def select_mode(message: Message):
         f"{mode['desc']}\n\n"
         "📎 Отправьте фото <b>файлом</b> (скрепка → Файл)\n"
         "Форматы: JPG · PNG · HEIC · WebP",
-        reply_markup=back_menu,
+        reply_markup=back_to_modes,
         parse_mode="HTML",
     )
 
@@ -1122,9 +1166,23 @@ async def _do_process(message: Message, data: bytes, filename: str):
     except Exception as e:
         logger.error("process_image error: %s", e)
         await status.delete()
-        await message.answer("❌ Ошибка обработки. Попробуй ещё раз.")
+        err_str = str(e).lower()
+        if "timeout" in err_str or "timed out" in err_str or "read timed" in err_str:
+            await message.answer(
+                "⏱ <b>Обработка заняла слишком много времени.</b>\n\n"
+                "Попробуйте ещё раз или выберите более лёгкий режим:\n"
+                "🌿 Натуральная ретушь или ✨ Чистая кожа — работают быстрее.",
+                reply_markup=back_to_modes,
+                parse_mode="HTML",
+            )
+        else:
+            await message.answer(
+                "❌ Ошибка обработки. Попробуй ещё раз.",
+                reply_markup=back_to_modes,
+            )
         await alert_admin(f"pipeline упал для user={uid}\n{type(e).__name__}: {e}")
         await log_event(uid, "photo_processing_error")
+        # НЕ списываем лимит — return до increment_trial_count
         return
     finally:
         pass  # блокировка управляется через _queue_worker
