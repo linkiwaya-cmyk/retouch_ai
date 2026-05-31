@@ -119,11 +119,11 @@ def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> byt
 
     task_id = data["id"]
 
-    for _ in range(120):
+    for _ in range(150):  # до 5 минут
         time.sleep(2)
         s = requests.get(
             f"{BASE_URL}/retoucher/status/{task_id}",
-            timeout=15,
+            timeout=90,
         ).json()
         if s.get("state") == "completed":
             break
