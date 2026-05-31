@@ -70,64 +70,57 @@ BOT_TOKEN      = os.getenv("BOT_TOKEN")
 
 # Welcome screen (premium/professional вариант)
 WELCOME_TEXT = (
-    "✦ <b>Retouch Lab</b> — AI-ретушь для всех\n\n"
-
+    "✨ <b>RETOUCH LAB</b>\n"
+    "<i>AI-ретушь фото прямо в Telegram</i>\n\n"
+    "━━━━━━━━━━━━━━━━━━\n"
     "Профессиональная Dodge & Burn ретушь за секунды.\n"
-    "Без потери качества.\n\n"
-
+    "Без потери качества. Без plastic-эффекта.\n\n"
+    "📷 Поддержка 4K / 24MP / HEIC / WebP\n"
+    "🎁 <b>Первые 3 фото — бесплатно</b>\n\n"
     "━━━━━━━━━━━━━━━━━━\n"
-    "✨ <b>Для обычных пользователей и блогеров</b>\n"
-    "✦ Clean skin без plastic-эффекта\n"
-    "✦ Улучши селфи и повседневные фото\n"
-    "✦ Удобно и просто — просто отправь фото\n"
-    "✦ Моментальный результат прямо в Telegram\n"
-    "✦ Не нужен опыт — справится каждый\n\n"
-
+    "Доступно <b>5 режимов обработки:</b>\n\n"
+    "✨ Чистая кожа\n"
+    "🌿 Натуральная ретушь\n"
+    "💫 Объём и свет\n"
+    "💄 Beauty Pro\n"
+    "🌟 Журнальный стиль\n\n"
     "━━━━━━━━━━━━━━━━━━\n"
-    "📷 <b>Для фотографов</b>\n"
-    "✦ Оригинальное разрешение — 4K / 24MP сохраняется\n"
-    "✦ JPEG quality 97, без сильного сжатия\n"
-    "✦ Родинки, текстура и поры остаются\n"
-    "✦ Natural retouch — готово для клиентской отдачи\n\n"
-
-    "━━━━━━━━━━━━━━━━━━\n"
-    "🎁 <b>3 бесплатные обработки</b> для новых пользователей\n\n"
-
-    "Отправь фото <b>файлом</b> (📎 → Файл) для полного качества\n"
-    "Форматы: JPG · PNG · HEIC · WebP"
+    "📌 Для лучшего качества отправляйте фото <b>файлом</b>\n"
+    "(📎 → Файл → выбрать фото)"
 )
 
 # О нас / About
 ABOUT_TEXT = (
-    "✦ <b>Retouch Lab</b> — профессиональный AI-ретушёр от Linkiway\n\n"
-
+    "✨ <b>RETOUCH LAB</b> — AI-ретушёр от Linkiway\n\n"
     "━━━━━━━━━━━━━━━━━━\n"
     "🎯 <b>Наш подход</b>\n\n"
     "Не AI beauty filter.\n"
-    "А <b>натуральная Dodge & Burn ретушь</b> — "
-    "как делают топовые ретушёры вручную.\n\n"
-
-    "✦ Clean skin — без мыльного эффекта\n"
+    "А <b>натуральная Dodge & Burn ретушь</b> —\n"
+    "как делают профессиональные ретушёры вручную.\n\n"
     "✦ Текстура кожи и поры сохраняются\n"
     "✦ Родинки и особенности лица остаются\n"
-    "✦ Натуральный тёплый skin tone\n"
-    "✦ Polished expensive look\n\n"
-
+    "✦ Натуральный цвет губ и тон кожи\n"
+    "✦ Оригинальное разрешение 4K / 24MP\n\n"
     "━━━━━━━━━━━━━━━━━━\n"
-    "📐 <b>Качество файла</b>\n\n"
-    "✦ Оригинальное разрешение сохраняется\n"
-    "✦ Поддержка 4K / 24MP и выше\n"
-    "✦ Не уменьшает фото до web-preview\n"
-    "✦ Подходит для профессиональной печати\n\n"
-
+    "🎨 <b>5 режимов обработки:</b>\n\n"
+    "✨ <b>Чистая кожа</b>\n"
+    "Минимальная обработка. Убирает дефекты,\n"
+    "сохраняет натуральность и текстуру.\n\n"
+    "🌿 <b>Натуральная ретушь</b>\n"
+    "Основной универсальный режим.\n"
+    "Чистая кожа + лёгкое выравнивание тона.\n\n"
+    "💫 <b>Объём и свет</b>\n"
+    "Акцент на светотень и объём лица.\n"
+    "Аккуратный Dodge & Burn.\n\n"
+    "💄 <b>Beauty Pro</b>\n"
+    "Качественная beauty-ретушь для соцсетей.\n"
+    "Чище, выразительнее — без пластика.\n\n"
+    "🌟 <b>Журнальный стиль</b>\n"
+    "Самый выразительный режим.\n"
+    "Editorial / magazine look.\n\n"
     "━━━━━━━━━━━━━━━━━━\n"
-    "⚡ <b>Экономия времени</b>\n\n"
-    "20–40 минут ручной ретуши → секунды.\n"
-    "Без потери качества.\n\n"
-
-    "━━━━━━━━━━━━━━━━━━\n"
-    "🚀 Retouch Lab постоянно развивается.\n"
-    "В будущем — новые AI-инструменты и функции."
+    "⚡ 20–40 минут ручной ретуши → секунды.\n"
+    "🚀 Retouch Lab постоянно развивается."
 )
 
 # Поддержка
@@ -197,8 +190,8 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.05},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.7,  "Alpha2": 0.25},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.7,  "Alpha2": 0.0},
                 {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.25},
             ]
         }
@@ -216,8 +209,8 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.55},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.18, "Alpha2": 0.18},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.1,  "Alpha2": 0.08},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.6,  "Alpha2": 0.25},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.1,  "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.6,  "Alpha2": 0.0},
                 {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.65},
             ]
         }
@@ -236,8 +229,8 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.95},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.65},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.28, "Alpha2": 0.28},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.0,  "Alpha2": 0.1},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.9,  "Alpha2": 0.35},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.0,  "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.85, "Alpha2": 0.0},
                 {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.42},
             ]
         }
@@ -256,8 +249,8 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 1.0},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.38, "Alpha2": 0.38},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.25, "Alpha2": 0.15},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 1.05, "Alpha2": 0.45},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.25, "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.95, "Alpha2": 0.0},
                 {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.65},
             ]
         }
@@ -419,6 +412,18 @@ async def cmd_start(message: Message, state: FSMContext):
         resize_keyboard=True,
     )
 
+    # Баннер если есть
+    banner_path = Path(__file__).parent / "start_banner.png"
+    if banner_path.exists():
+        try:
+            await message.answer_photo(
+                photo=FSInputFile(str(banner_path)),
+                caption="✨ <b>RETOUCH LAB</b>",
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.warning("Banner send failed: %s", e)
+
     await message.answer(
         WELCOME_TEXT,
         reply_markup=dynamic_menu,
@@ -566,9 +571,8 @@ async def menu_before_after(message: Message):
 
     # ── Fallback: нет ни видео ни фото ───────────────────────────────────────
     await message.answer(
-        "🖼 <b>Before / After — Retouch Lab</b>\n\n"
-        + DESCRIPTION + "\n\n"
-        "Скоро здесь появятся примеры 📸",
+        "🎥 Примеры временно обновляются.\n\n"
+        + DESCRIPTION,
         reply_markup=back_menu,
         parse_mode="HTML",
     )
