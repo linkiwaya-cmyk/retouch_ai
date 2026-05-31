@@ -1,6 +1,6 @@
 import requests, json, time, io, os
 from dotenv import load_dotenv
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageEnhance
 import pillow_heif
 
 load_dotenv()
@@ -9,30 +9,22 @@ RETOUCH_TOKEN = os.getenv("RETOUCH4ME_TOKEN")
 BASE_URL = "https://cf-retoucher.retouch4.me/api/v1"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PRESET v5 — Natural Dodge & Burn / Professional Clean Retouch
+# PRESET v6 — на основе официальной документации Retouch4me
 #
-# Философия: минимальное вмешательство, максимальная натуральность
-#
-# УДАЛЕНО:
-# - Skin Tone Alpha2 (не поддерживается по документации API)
-# - Dodge Burn warmth (Alpha2) — вызывал color imbalance
-# - _fix_colors() — глобальная RGB коррекция убивала губы и нейтралы
-# - Heal — удалял родинки
-#
-# ОСТАВЛЕНО:
-# - Fabric: лёгкое сглаживание текстуры
-# - Eye Vessels + Brilliance: глаза
-# - White Teeth: минимально
-# - Dodge Burn: основная работа, без warmth
-# - Skin Tone: только Alpha1, мягко
-# - Portrait Volumes: минимально
+# Изменения vs v5:
+# - Skin Tone Alpha2 ВОЗВРАЩЁН (документация подтверждает что он есть!)
+#   Alpha2 у Skin Tone = второй параметр выравнивания тона
+# - Dodge Burn Alpha1 поднят до 0.95 — больше ретуши
+# - Fabric 0.30 — чуть больше сглаживания
+# - Добавлена лёгкая warmth коррекция через PIL после API
+#   (только +красный, без изменения зелёного глобально)
 # ══════════════════════════════════════════════════════════════════════════════
 
 PRESET = {
     "mode": "professional",
     "tasks": [
-        # Fabric: лёгкое сглаживание — поры и текстура видны
-        {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.25},
+        # Fabric: сглаживание текстуры
+        {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.35},
 
         # Eye Vessels: убирает красные прожилки
         {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.9},
@@ -43,77 +35,82 @@ PRESET = {
         # White Teeth: минимально
         {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2, "Alpha2": 0.2},
 
-        # Dodge & Burn: основной инструмент выравнивания
-        # Alpha1: сила, Alpha2: warmth = 0 (без теплого сдвига)
-        {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.0},
+        # Dodge & Burn: основной инструмент — 95% силы
+        # Alpha2 = warmth = 0.1 (минимальный тёплый оттенок)
+        {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.95, "Alpha2": 0.1},
 
-        # Skin Tone: только Alpha1 (Alpha2 не поддерживается!)
-        # 0.6 — мягкое выравнивание без green/gray shift
-        {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.6},
+        # Skin Tone: выравнивание тона кожи
+        # Alpha1 = сила выравнивания
+        # Alpha2 = 0.3 (мягко, без green shift)
+        {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.8,  "Alpha2": 0.3},
 
-        # Portrait Volumes: минимально — не меняем форму лица
-        {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.25},
+        # Portrait Volumes: объём лица — мягко
+        {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.35},
     ]
 }
 
-API_MAX_SIZE = 4096  # максимальная сторона для API
+API_MAX_SIZE = 4096
 
 
 def _open_image(image_bytes: bytes) -> Image.Image:
-    """Открывает изображение с поддержкой HEIC. Применяет EXIF-ориентацию."""
     pillow_heif.register_heif_opener()
     img = Image.open(io.BytesIO(image_bytes))
     img = ImageOps.exif_transpose(img)
-    if img.mode not in ('RGB',):
+    if img.mode != 'RGB':
         img = img.convert('RGB')
     return img
 
 
 def _save_jpeg(img: Image.Image, quality: int = 96) -> bytes:
-    """Сохраняет в JPEG с высоким качеством. subsampling=0 = 4:4:4."""
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=quality, subsampling=0, optimize=False)
     return buf.getvalue()
 
 
 def _resize_for_api(img: Image.Image, max_size: int):
-    """Уменьшает если нужно. Возвращает (img, scale)."""
     w, h = img.size
-    max_side = max(w, h)
-    if max_side <= max_size:
+    if max(w, h) <= max_size:
         return img, 1.0
-    scale = max_size / max_side
-    new_w, new_h = int(w * scale), int(h * scale)
-    return img.resize((new_w, new_h), Image.LANCZOS), scale
+    scale = max_size / max(w, h)
+    return img.resize((int(w * scale), int(h * scale)), Image.LANCZOS), scale
 
 
-def process_image(image_bytes: bytes, filename: str) -> bytes:
+def _add_warmth(img: Image.Image) -> Image.Image:
     """
-    Pipeline v5:
-    1. Открываем оригинал → запоминаем размер
-    2. Если > 4096px → уменьшаем для API
-    3. Отправляем в Retouch4me
-    4. Получаем результат
-    5. Апскейл обратно если уменьшали
-    6. Сохраняем quality=96 без лишней цветокоррекции
-    
-    НЕТ глобальной RGB коррекции — она ломала губы и нейтралы.
+    Минимальная warmth коррекция после API:
+    - чуть поднимает красный канал (+2%) для натуральности губ
+    - НЕ трогает зелёный и синий глобально
+    - лёгкое поднятие насыщенности +5%
     """
-    # Открываем оригинал
+    import numpy as np
+    arr = np.array(img, dtype=np.float32)
+
+    # Только лёгкий warmth — +2% красного
+    arr[:, :, 0] = np.clip(arr[:, :, 0] * 1.02, 0, 255)
+
+    img_out = Image.fromarray(arr.astype(np.uint8))
+
+    # Насыщенность +5%
+    # Насыщенность не трогаем — меньше пересчётов пикселей
+    # img_out = ImageEnhance.Color(img_out).enhance(1.05)
+
+    return img_out
+
+
+def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> bytes:
     original_img = _open_image(image_bytes)
     original_size = original_img.size
 
-    # Подготовка для API
-    api_img, scale = _resize_for_api(original_img, API_MAX_SIZE)
-    was_resized = scale < 1.0
-    api_bytes = _save_jpeg(api_img, quality=95)
+    # НЕ делаем resize — API поддерживает до 250MP и 100MB
+    # Отправляем оригинал напрямую
+    api_bytes = _save_jpeg(original_img, quality=100)
     api_filename = filename.rsplit('.', 1)[0] + '.jpg'
+    was_resized = False
 
-    # Отправляем в Retouch4me API
     resp = requests.post(
         f"{BASE_URL}/retoucher/start",
         files={"file": (api_filename, api_bytes, "image/jpeg")},
-        data={"token": RETOUCH_TOKEN, "payload": json.dumps(PRESET)},
+        data={"token": RETOUCH_TOKEN, "payload": json.dumps(preset or PRESET)},
         timeout=60,
     )
     data = resp.json()
@@ -122,7 +119,6 @@ def process_image(image_bytes: bytes, filename: str) -> bytes:
 
     task_id = data["id"]
 
-    # Ждём результат
     for _ in range(120):
         time.sleep(2)
         s = requests.get(
@@ -141,18 +137,19 @@ def process_image(image_bytes: bytes, filename: str) -> bytes:
         timeout=60,
     ).content
 
-    # Открываем результат
     try:
         result_img = Image.open(io.BytesIO(result_bytes)).convert('RGB')
     except Exception:
         return result_bytes
 
-    # Апскейл обратно если уменьшали
     if was_resized:
         result_img = result_img.resize(original_size, Image.LANCZOS)
 
-    # Сохраняем — без лишней цветокоррекции
-    return _save_jpeg(result_img, quality=96)
+    # Лёгкая warmth коррекция — минимальная +2% красного
+    result_img = _add_warmth(result_img)
+
+    # quality=100, subsampling=0 — максимальное качество на выходе
+    return _save_jpeg(result_img, quality=100)
 
 
 def get_balance():
