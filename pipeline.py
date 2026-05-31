@@ -37,12 +37,12 @@ PRESET = {
 
         # Dodge & Burn: основной инструмент — 95% силы
         # Alpha2 = warmth = 0.1 (минимальный тёплый оттенок)
-        {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.95, "Alpha2": 0.1},
+        {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.95, "Alpha2": 0.0},  # warmth=0 — не трогаем губы
 
         # Skin Tone: выравнивание тона кожи
         # Alpha1 = сила выравнивания
         # Alpha2 = 0.3 (мягко, без green shift)
-        {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.8,  "Alpha2": 0.3},
+        {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.75, "Alpha2": 0.0},  # Alpha2=0 — не меняем тон губ
 
         # Portrait Volumes: объём лица — мягко
         {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.35},
@@ -145,8 +145,8 @@ def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> byt
     if was_resized:
         result_img = result_img.resize(original_size, Image.LANCZOS)
 
-    # Лёгкая warmth коррекция — минимальная +2% красного
-    result_img = _add_warmth(result_img)
+    # _add_warmth убрана — она меняла цвет губ глобально
+    # Цвет губ теперь сохраняется как в оригинале
 
     # quality=100, subsampling=0 — максимальное качество на выходе
     return _save_jpeg(result_img, quality=100)
