@@ -161,6 +161,98 @@ PHOTO_BLOCKED_TEXT = (
     "и возвращает файл в полном качестве — 4K, 24MP и выше."
 )
 ADMIN_ID       = int(os.getenv("ADMIN_CHAT_ID", "532189427"))
+
+# ══════════════════════════════════════════════════════════════════════════════
+# РЕЖИМЫ ОБРАБОТКИ — 5 пресетов
+# ══════════════════════════════════════════════════════════════════════════════
+
+MODES = {
+    "clean": {
+        "name": "✨ Чистая кожа",
+        "desc": "Убирает прыщи и дефекты. Почти не меняет лицо — максимально натурально.",
+        "preset": {
+            "mode": "professional",
+            "tasks": [
+                {"Plugin": "Heal",          "Scale": 0, "Alpha1": 0.5},
+                {"Plugin": "Eye Vessels",   "Scale": 0, "Alpha1": 0.7},
+                {"Plugin": "Fabric",        "Scale": 0, "Alpha1": 0.15},
+                {"Plugin": "Dodge Burn",    "Scale": 2, "Alpha1": 0.4,  "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",     "Scale": 0, "Alpha1": 0.3},
+            ]
+        }
+    },
+    "natural": {
+        "name": "🌿 Натуральная ретушь",
+        "desc": "Основной режим. Чистит кожу, сохраняет текстуру, улучшает тон. Для каждого дня.",
+        "preset": {
+            "mode": "professional",
+            "tasks": [
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.30},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.9},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.4},
+                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.95, "Alpha2": 0.1},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.8,  "Alpha2": 0.3},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.30},
+            ]
+        }
+    },
+    "depth": {
+        "name": "💫 Объём и свет",
+        "desc": "Добавляет объём лицу, усиливает светотень. Дорогой профессиональный вид.",
+        "preset": {
+            "mode": "professional",
+            "tasks": [
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.25},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.9},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.6},
+                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.2,  "Alpha2": 0.1},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.7,  "Alpha2": 0.3},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.6},
+            ]
+        }
+    },
+    "beauty": {
+        "name": "💄 Beauty Pro",
+        "desc": "Для Instagram и соцсетей. Тщательная чистка кожи, красивые глаза, профессиональный beauty-эффект.",
+        "preset": {
+            "mode": "professional",
+            "tasks": [
+                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.4},
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.45},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 1.0},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.7},
+                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.3,  "Alpha2": 0.3},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.1,  "Alpha2": 0.15},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 1.0,  "Alpha2": 0.4},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.45},
+            ]
+        }
+    },
+    "magazine": {
+        "name": "🌟 Журнальный стиль",
+        "desc": "Самая сильная обработка. Рекламный эффект, максимально чистая кожа, глянцевый результат.",
+        "preset": {
+            "mode": "professional",
+            "tasks": [
+                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.6},
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.6},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 1.0},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.85},
+                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.4,  "Alpha2": 0.4},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.35, "Alpha2": 0.2},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 1.1,  "Alpha2": 0.5},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.7},
+            ]
+        }
+    },
+}
+
+# Текущий режим пользователя — хранится в памяти (сбрасывается при рестарте)
+_user_mode: dict = {}  # uid → mode_key
+
+DEFAULT_MODE = "natural"  # режим по умолчанию
 # GROUP_CHAT_ID — отдельная группа куда приходят чеки с кнопками approve/reject
 # Получить: создай группу → добавь бота → напиши /start → смотри getUpdates
 GROUP_CHAT_ID  = int(os.getenv("GROUP_CHAT_ID", os.getenv("ADMIN_CHAT_ID", "532189427")))
@@ -218,10 +310,22 @@ class BroadcastStates(StatesGroup):
 # ── Клавиатуры ────────────────────────────────────────────────────────────────
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="📸 Обработать фото")],
-        [KeyboardButton(text="💎 Подписка"), KeyboardButton(text="🖼 Before / After")],
-        [KeyboardButton(text="📂 Форматы"), KeyboardButton(text="ℹ️ О нас")],
+        [KeyboardButton(text="✨ Обработать фото")],
+        [KeyboardButton(text="🎁 Попробовать бесплатно"), KeyboardButton(text="💎 Подписка")],
+        [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="ℹ️ О боте")],
         [KeyboardButton(text="💬 Поддержка")],
+    ],
+    resize_keyboard=True,
+)
+
+modes_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="✨ Чистая кожа")],
+        [KeyboardButton(text="🌿 Натуральная ретушь")],
+        [KeyboardButton(text="💫 Объём и свет")],
+        [KeyboardButton(text="💄 Beauty Pro")],
+        [KeyboardButton(text="🌟 Журнальный стиль")],
+        [KeyboardButton(text="📖 О режимах"), KeyboardButton(text="⬅️ Назад")],
     ],
     resize_keyboard=True,
 )
@@ -271,9 +375,32 @@ async def cmd_start(message: Message, state: FSMContext):
         username=message.from_user.username,
         first_name=message.from_user.first_name,
     )
+    # Динамическое приветствие
+    uid = message.from_user.id
+    has_sub = bool(await check_active_subscription(uid))
+    trial_used = await get_trial_count(uid)
+    remaining = max(0, TRIAL_LIMIT - trial_used)
+
+    if has_sub:
+        trial_btn = "✨ Обработать фото"
+    elif remaining > 0:
+        trial_btn = f"🎁 Попробовать бесплатно (осталось {remaining} из {TRIAL_LIMIT})"
+    else:
+        trial_btn = "💎 Купить подписку"
+
+    dynamic_menu = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=trial_btn)],
+            [KeyboardButton(text="✨ Обработать фото")],
+            [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="💎 Подписка")],
+            [KeyboardButton(text="ℹ️ О боте"), KeyboardButton(text="💬 Поддержка")],
+        ],
+        resize_keyboard=True,
+    )
+
     await message.answer(
         WELCOME_TEXT,
-        reply_markup=main_menu,
+        reply_markup=dynamic_menu,
         parse_mode="HTML",
     )
 
@@ -288,7 +415,7 @@ async def back(message: Message, state: FSMContext):
     await message.answer("Главное меню 👇", reply_markup=main_menu)
 
 
-@dp.message(F.text == "ℹ️ О нас")
+@dp.message(F.text == "ℹ️ О боте")
 async def menu_about(message: Message):
     await message.answer(
         ABOUT_TEXT,
@@ -306,7 +433,7 @@ async def menu_support(message: Message):
     )
 
 
-@dp.message(F.text == "🖼 Before / After")
+@dp.message(F.text.in_({"🖼 Before / After", "🎥 Примеры до / после"}))
 async def menu_before_after(message: Message):
     from aiogram.types import InputMediaPhoto
 
@@ -427,11 +554,101 @@ async def menu_formats(message: Message):
     )
 
 
-@dp.message(F.text == "📸 Обработать фото")
-async def menu_process(message: Message):
+@dp.message(F.text == "📖 О режимах")
+async def menu_about_modes(message: Message):
     await message.answer(
-        SEND_PHOTO_TEXT,
+        "📖 <b>Режимы обработки Retouch Lab</b>\n\n"
+        "✨ <b>Чистая кожа</b>\n"
+        "Убирает прыщи и дефекты. Почти не меняет лицо. Для тех кто хочет минимум изменений.\n\n"
+        "🌿 <b>Натуральная ретушь</b>\n"
+        "Лучший вариант на каждый день. Чистит кожу, сохраняет текстуру и натуральность.\n\n"
+        "💫 <b>Объём и свет</b>\n"
+        "Добавляет объём лицу, усиливает светотень. Дорогой профессиональный вид.\n\n"
+        "💄 <b>Beauty Pro</b>\n"
+        "Для Instagram и соцсетей. Красивая чистая кожа, выразительные глаза.\n\n"
+        "🌟 <b>Журнальный стиль</b>\n"
+        "Самая сильная обработка. Рекламный глянцевый эффект.",
+        reply_markup=modes_keyboard,
+        parse_mode="HTML",
+    )
+
+
+@dp.message(F.text.in_({
+    "✨ Чистая кожа", "🌿 Натуральная ретушь",
+    "💫 Объём и свет", "💄 Beauty Pro", "🌟 Журнальный стиль"
+}))
+async def select_mode(message: Message):
+    mode_map = {
+        "✨ Чистая кожа":       "clean",
+        "🌿 Натуральная ретушь": "natural",
+        "💫 Объём и свет":      "depth",
+        "💄 Beauty Pro":        "beauty",
+        "🌟 Журнальный стиль":  "magazine",
+    }
+    uid = message.from_user.id
+    mode_key = mode_map[message.text]
+    _user_mode[uid] = mode_key
+    mode = MODES[mode_key]
+
+    await message.answer(
+        f"✅ <b>Режим выбран: {mode['name']}</b>\n\n"
+        f"{mode['desc']}\n\n"
+        "📎 Отправьте фото <b>файлом</b> (скрепка → Файл)\n"
+        "Форматы: JPG · PNG · HEIC · WebP",
         reply_markup=back_menu,
+        parse_mode="HTML",
+    )
+
+
+@dp.message(F.text == "🎁 Попробовать бесплатно")
+async def menu_try_free(message: Message):
+    uid = message.from_user.id
+    has_sub = bool(await check_active_subscription(uid))
+    trial_used = await get_trial_count(uid)
+    remaining = max(0, TRIAL_LIMIT - trial_used)
+
+    if has_sub:
+        await message.answer(
+            "💎 У вас активная подписка — обрабатывайте без ограничений!\n\n"
+            "Выберите режим обработки 👇",
+            reply_markup=modes_keyboard,
+            parse_mode="HTML",
+        )
+    elif remaining > 0:
+        await message.answer(
+            f"🎁 <b>Вам доступно {remaining} из {TRIAL_LIMIT} бесплатных обработок</b>\n\n"
+            "Выберите режим обработки 👇",
+            reply_markup=modes_keyboard,
+            parse_mode="HTML",
+        )
+    else:
+        await message.answer(
+            "✨ <b>Бесплатные обработки использованы</b>\n\n"
+            "💡 Ретушёр берёт 300–1500 сом за одно фото.\n"
+            "Retouch Lab — 990 сом в месяц без ограничений.\n\n"
+            "⏰ Выберите тариф 👇",
+            reply_markup=plans_keyboard(),
+            parse_mode="HTML",
+        )
+
+
+# Динамическая кнопка "Попробовать бесплатно (осталось X из 3)"
+@dp.message(F.text.startswith("🎁 Попробовать бесплатно (осталось"))
+async def menu_try_free_dynamic(message: Message):
+    await menu_try_free(message)
+
+
+@dp.message(F.text.in_({"✨ Обработать фото", "📸 Обработать фото"}))
+async def menu_process(message: Message):
+    uid = message.from_user.id
+    current_mode = _user_mode.get(uid, DEFAULT_MODE)
+    mode = MODES[current_mode]
+    await message.answer(
+        f"✅ <b>Текущий режим: {mode['name']}</b>\n\n"
+        f"{mode['desc']}\n\n"
+        "Выберите другой режим или отправьте фото 📎\n"
+        "Форматы: JPG · PNG · HEIC · WebP",
+        reply_markup=modes_keyboard,
         parse_mode="HTML",
     )
 
@@ -485,6 +702,52 @@ async def callback_open_plans(callback: CallbackQuery):
         reply_markup=plans_keyboard(),
         parse_mode="HTML",
     )
+
+
+@dp.callback_query(F.data == "buy_promo_1m")
+async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
+    """Акционная покупка — 799 сом. Работает только через /promo рассылку."""
+    uid = callback.from_user.id
+
+    # Проверяем — если уже есть подписка, кнопка не работает
+    if await check_active_subscription(uid):
+        await callback.answer("У вас уже есть активная подписка! ✅", show_alert=True)
+        return
+
+    PROMO_PRICE = 799
+    plan_type = "1m"
+    plan_name = "1 месяц (акция 🔥)"
+
+    await state.update_data(plan_type=plan_type)
+    await state.set_state(PaymentStates.waiting_screenshot)
+    await callback.answer()
+
+    caption = (
+        f"🔥 <b>Акция: {plan_name} — {PROMO_PRICE} сом (~$9)</b>\n\n"
+        f"Переведите <b>{PROMO_PRICE} сом</b> на MBank:\n\n"
+        f"👤 <b>{MBANK_NAME}</b>\n"
+        f"📱 <b>{MBANK_PHONE}</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📌 <b>Как оплатить:</b>\n"
+        "1. Откройте MBank\n"
+        "2. Переводы → По номеру телефона\n"
+        f"3. Введите сумму: <b>{PROMO_PRICE} сом (~$9)</b>\n"
+        "4. Переведите и сохраните чек\n"
+        "5. Отправьте скриншот сюда 👇\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "⏳ Подписка активируется в течение нескольких минут."
+    )
+
+    if QR_PATH.exists():
+        await callback.message.answer_photo(
+            photo=FSInputFile(QR_PATH),
+            caption=caption,
+            parse_mode="HTML",
+        )
+    else:
+        await callback.message.answer(caption, parse_mode="HTML")
+
+    await callback.message.answer("📸 Отправьте скриншот чека 👇")
 
 
 @dp.callback_query(F.data.startswith("buy_"))
@@ -852,8 +1115,10 @@ async def _do_process(message: Message, data: bytes, filename: str):
     status = await message.answer("⏳ Обрабатываю фото...")
 
     try:
+        # Берём пресет режима пользователя
+        user_preset = MODES.get(_user_mode.get(uid, DEFAULT_MODE), MODES[DEFAULT_MODE])["preset"]
         loop   = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, process_image, data, filename)
+        result = await loop.run_in_executor(None, process_image, data, filename, user_preset)
     except Exception as e:
         logger.error("process_image error: %s", e)
         await status.delete()
@@ -1076,6 +1341,152 @@ async def cmd_stats(message: Message):
         f"❌ Ошибок pipeline: <b>{s.get('photo_processing_error', 0)}</b>",
         parse_mode="HTML",
     )
+
+
+@dp.message(Command("promo"))
+async def cmd_promo(message: Message, state: FSMContext):
+    """
+    Акционная рассылка — только для администратора.
+    Отправляется ТОЛЬКО пользователям БЕЗ активной подписки.
+    Использование: /promo
+    """
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    # Кнопка "Купить за 799 сом" — только в акции, не в обычных тарифах
+    promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="🔥 Купить за 799 сом (~$9)",
+            callback_data="buy_promo_1m"
+        )
+    ]])
+
+    PROMO_TEXT = (
+        "🔥 ——————————————— 🔥\n"
+        "<b>С Ч А С Т Л И В Ы Е</b>\n"
+        "<b>      Ч А С Ы</b>\n"
+        "🔥 ——————————————— 🔥\n\n"
+        "<i>Только сегодня — подписка на 1 месяц</i>\n\n"
+        "💎 <b>799 сом</b>  <s>990 сом</s>  (~<b>$9</b> вместо $11)\n\n"
+        "✦ Неограниченная AI-ретушь\n"
+        "✦ Natural Dodge & Burn — без пластика\n"
+        "✦ Оригинальное разрешение 4K / 24MP\n"
+        "✦ 5 режимов обработки\n\n"
+        "⏰ <b>Акция действует 24 часа</b>"
+    )
+
+    # Получаем только пользователей БЕЗ подписки
+    from database import DB_PATH
+    import aiosqlite as _aio
+    async with _aio.connect(DB_PATH) as db:
+        async with db.execute("""
+            SELECT u.telegram_id FROM users u
+            WHERE u.is_inactive = 0
+            AND NOT EXISTS (
+                SELECT 1 FROM subscriptions s
+                WHERE s.telegram_id = u.telegram_id
+                  AND s.is_active = 1
+                  AND datetime(s.end_date) > datetime('now')
+            )
+        """) as cur:
+            rows = await cur.fetchall()
+            target_ids = [r[0] for r in rows]
+
+    all_users = await get_all_users()
+
+    confirm_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Отправить", callback_data="promo_send_confirm"),
+        InlineKeyboardButton(text="❌ Отмена",    callback_data="promo_cancel"),
+    ]])
+
+    await state.update_data(
+        promo_text=PROMO_TEXT,
+        promo_target_ids=target_ids,
+    )
+    await state.set_state(BroadcastStates.waiting_confirm)
+
+    await message.answer(
+        f"🔥 <b>Акционная рассылка — Счастливые часы</b>\n\n"
+        f"Всего пользователей: <b>{len(all_users)}</b>\n"
+        f"👥 Получат (без подписки): <b>{len(target_ids)}</b>\n"
+        f"💎 Пропущены (есть подписка): <b>{len(all_users) - len(target_ids)}</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"{PROMO_TEXT}\n\n"
+        f"[кнопка: 🔥 Купить за 799 сом (~$9)]\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"Отправить?",
+        reply_markup=confirm_kb,
+        parse_mode="HTML",
+    )
+
+
+@dp.callback_query(F.data == "promo_send_confirm", BroadcastStates.waiting_confirm)
+async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
+    """Запускаем акционную рассылку только для пользователей без подписки."""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Нет доступа", show_alert=True)
+        return
+
+    data = await state.get_data()
+    promo_text = data.get("promo_text", "")
+    target_ids = data.get("promo_target_ids", [])
+    await state.clear()
+    await callback.answer()
+
+    promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="🔥 Купить за 799 сом (~$9)",
+            callback_data="buy_promo_1m"
+        )
+    ]])
+
+    status_msg = await callback.message.answer(
+        f"🚀 <b>Акционная рассылка запущена...</b>\n"
+        f"Получателей: {len(target_ids)}",
+        parse_mode="HTML",
+    )
+
+    sent = blocked = errors = 0
+    from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
+
+    for i, uid in enumerate(target_ids):
+        try:
+            await bot.send_message(
+                chat_id=uid,
+                text=promo_text,
+                reply_markup=promo_buy_kb,
+                parse_mode="HTML",
+            )
+            sent += 1
+        except TelegramForbiddenError:
+            blocked += 1
+        except Exception:
+            errors += 1
+
+        if (i + 1) % 25 == 0:
+            import asyncio as _asyncio
+            await _asyncio.sleep(1.5)
+        else:
+            import asyncio as _asyncio
+            await _asyncio.sleep(0.05)
+
+    await status_msg.edit_text(
+        f"✅ <b>Акционная рассылка завершена!</b>\n\n"
+        f"👥 Отправлено: <b>{len(target_ids)}</b>\n"
+        f"✅ Доставлено: <b>{sent}</b>\n"
+        f"🚫 Заблокировали: <b>{blocked}</b>\n"
+        f"❌ Ошибки: <b>{errors}</b>",
+        parse_mode="HTML",
+    )
+
+
+@dp.callback_query(F.data == "promo_cancel", BroadcastStates.waiting_confirm)
+async def promo_cancelled(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        return
+    await state.clear()
+    await callback.answer()
+    await callback.message.edit_text("❌ Рассылка отменена")
 
 
 @dp.message(Command("relaunch"))
