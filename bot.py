@@ -70,23 +70,23 @@ BOT_TOKEN      = os.getenv("BOT_TOKEN")
 
 # Welcome screen (premium/professional вариант)
 WELCOME_TEXT = (
-    "✨ <b>RETOUCH LAB</b>\n"
-    "<i>AI-ретушь фото прямо в Telegram</i>\n\n"
-    "━━━━━━━━━━━━━━━━━━\n"
+    "✦ ═══════════════════ ✦\n"
+    "✨ <b>R E T O U C H   L A B</b>\n"
+    "<i>AI-ретушь фото прямо в Telegram</i>\n"
+    "✦ ═══════════════════ ✦\n\n"
     "Профессиональная Dodge & Burn ретушь за секунды.\n"
     "Без потери качества. Без plastic-эффекта.\n\n"
-    "📷 Поддержка 4K / 24MP / HEIC / WebP\n"
+    "━━━━━━━━━━━━━━━━━━\n"
+    "🎨 <b>5 режимов обработки:</b>\n\n"
+    "✨ Чистая кожа — минимально, натурально\n"
+    "🌿 Натуральная ретушь — для каждого дня\n"
+    "💫 Объём и свет — глубина, светотень\n"
+    "💄 Beauty Pro — для соцсетей и Instagram\n"
+    "🌟 Журнальный стиль — editorial look\n\n"
+    "━━━━━━━━━━━━━━━━━━\n"
+    "📷 4K / 24MP / HEIC / WebP\n"
     "🎁 <b>Первые 3 фото — бесплатно</b>\n\n"
-    "━━━━━━━━━━━━━━━━━━\n"
-    "Доступно <b>5 режимов обработки:</b>\n\n"
-    "✨ Чистая кожа\n"
-    "🌿 Натуральная ретушь\n"
-    "💫 Объём и свет\n"
-    "💄 Beauty Pro\n"
-    "🌟 Журнальный стиль\n\n"
-    "━━━━━━━━━━━━━━━━━━\n"
-    "📌 Для лучшего качества отправляйте фото <b>файлом</b>\n"
-    "(📎 → Файл → выбрать фото)"
+    "📌 Отправляйте фото <b>файлом</b> (📎 → Файл)"
 )
 
 # О нас / About
@@ -405,7 +405,6 @@ async def cmd_start(message: Message, state: FSMContext):
     dynamic_menu = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=trial_btn)],
-            [KeyboardButton(text="✨ Обработать фото")],
             [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="💎 Подписка")],
             [KeyboardButton(text="ℹ️ О боте"), KeyboardButton(text="💬 Поддержка")],
         ],
