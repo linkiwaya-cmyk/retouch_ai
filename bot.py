@@ -163,7 +163,7 @@ MODES = {
     "clean": {
         "name": "✨ Чистая кожа",
         "desc": (
-            "Минимальная обработка. Убирает прыщи и временные дефекты.\n"
+            "Минимальная обработка. Убирает прыщи и дефекты.\n"
             "Максимально натуральный результат — текстура и родинки сохраняются."
         ),
         "preset": {
@@ -173,7 +173,6 @@ MODES = {
                 {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.6},
                 {"Plugin": "Fabric",      "Scale": 0, "Alpha1": 0.12},
                 {"Plugin": "Dodge Burn",  "Scale": 2, "Alpha1": 0.35, "Alpha2": 0.0},
-                {"Plugin": "Skin Tone",   "Scale": 0, "Alpha1": 0.25},
             ]
         }
     },
@@ -181,7 +180,7 @@ MODES = {
         "name": "🌿 Натуральная ретушь",
         "desc": (
             "Основной режим для каждого дня.\n"
-            "Чистит кожу, сохраняет текстуру и поры, улучшает общий тон."
+            "Чистит кожу, сохраняет текстуру и поры, улучшает Dodge & Burn лица."
         ),
         "preset": {
             "mode": "professional",
@@ -191,7 +190,7 @@ MODES = {
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
                 {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.0},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.7,  "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.7},
                 {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.25},
             ]
         }
@@ -200,7 +199,7 @@ MODES = {
         "name": "💫 Объём и свет",
         "desc": (
             "Добавляет объём и глубину лицу.\n"
-            "Усиливает светотень — дорогой профессиональный вид без лишней ретуши."
+            "Усиливает Dodge & Burn — профессиональный портретный вид."
         ),
         "preset": {
             "mode": "professional",
@@ -210,7 +209,7 @@ MODES = {
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.55},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.18, "Alpha2": 0.18},
                 {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.1,  "Alpha2": 0.0},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.6,  "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.6},
                 {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.65},
             ]
         }
@@ -219,7 +218,7 @@ MODES = {
         "name": "💄 Beauty Pro",
         "desc": (
             "Качественная beauty-ретушь для Instagram и соцсетей.\n"
-            "Чистая кожа, выразительные глаза, ухоженный вид — без пластика."
+            "Чистая кожа, выразительные глаза — без пластика и изменения цвета."
         ),
         "preset": {
             "mode": "professional",
@@ -230,7 +229,7 @@ MODES = {
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.65},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.28, "Alpha2": 0.28},
                 {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.0,  "Alpha2": 0.0},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.85, "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.85},
                 {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.42},
             ]
         }
@@ -238,8 +237,8 @@ MODES = {
     "magazine": {
         "name": "🌟 Журнальный стиль",
         "desc": (
-            "Премиальный editorial-режим. Максимально чистая кожа,\n"
-            "выраженный объём и контуры — журнальный глянцевый результат."
+            "Премиальный editorial-режим.\n"
+            "Максимально чистая кожа, выраженный объём — magazine look."
         ),
         "preset": {
             "mode": "professional",
@@ -250,15 +249,12 @@ MODES = {
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.38, "Alpha2": 0.38},
                 {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.25, "Alpha2": 0.0},
-                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.95, "Alpha2": 0.0},
+                {"Plugin": "Skin Tone",        "Scale": 0, "Alpha1": 0.95},
                 {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.65},
             ]
         }
     },
 }
-
-# Текущий режим пользователя — хранится в памяти (сбрасывается при рестарте)
-_user_mode: dict = {}  # uid → mode_key
 
 DEFAULT_MODE = "natural"  # режим по умолчанию
 # GROUP_CHAT_ID — отдельная группа куда приходят чеки с кнопками approve/reject
