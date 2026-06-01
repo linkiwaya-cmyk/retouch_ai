@@ -55,7 +55,7 @@ from database import (
     TRIAL_LIMIT,
 )
 from notifications import send_expiry_notifications
-from texts import t, LANGUAGES, MODES_TRANSLATED
+from texts import t, LANGUAGES, MODES_TRANSLATED, TEXTS
 from database import get_user_language, set_user_language
 from broadcast import broadcast, get_all_users
 from reminders import send_reminders, RELAUNCH_MESSAGE
@@ -401,7 +401,7 @@ main_menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="✨ Обработать фото")],
         [KeyboardButton(text="🎁 Попробовать бесплатно"), KeyboardButton(text="💎 Подписка")],
         [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="ℹ️ О боте")],
-        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text=TEXTS.get("btn_language", {}).get(lang, "🌐 Language"))],
+        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text="🌐 Язык / Language")],
     ],
     resize_keyboard=True,
 )
@@ -608,7 +608,7 @@ async def cmd_start(message: Message, state: FSMContext):
     menu_rows += [
         [KeyboardButton(text="✨ Обработать фото")],
         [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="💎 Подписка")],
-        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text=TEXTS.get("btn_language", {}).get(lang, "🌐 Language"))],
+        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text="🌐 Язык / Language")],
         [KeyboardButton(text="ℹ️ О боте")],
     ]
 
