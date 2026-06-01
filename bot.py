@@ -399,10 +399,12 @@ async def cmd_start(message: Message, state: FSMContext):
 
     if has_sub:
         trial_btn = "✨ Обработать фото"
-    elif promo_active and not has_sub:
-        trial_btn = "🔥 Акция — 799 сом (~$9)"
     elif remaining > 0:
+        # Если есть бесплатные попытки — показываем их (акция не скрывает)
         trial_btn = f"🎁 Попробовать бесплатно (осталось {remaining} из {TRIAL_LIMIT})"
+    elif promo_active:
+        # Бесплатные закончились + акция активна
+        trial_btn = "🔥 Акция — 799 сом (~$9)"
     else:
         trial_btn = "💎 Купить подписку"
 
