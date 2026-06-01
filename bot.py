@@ -49,6 +49,8 @@ from database import (
     increment_trial_count,
     get_pending_payments,
     PLAN_NAMES,
+    PLAN_NAMES_LANG,
+    get_plan_name,
     PLAN_PRICES,
     TRIAL_LIMIT,
 )
@@ -842,17 +844,19 @@ async def select_mode(message: Message):
         "🌟 Журнальный стиль": "magazine",
         # EN
         "✨ Clean Skin": "clean", "🌿 Natural Retouch": "natural",
-        "💫 Depth & Light": "depth", "🌟 Magazine Style": "magazine",
+        "💫 Depth & Light": "depth", "💄 Beauty Pro": "beauty",
+        "🌟 Magazine Style": "magazine",
         # VI
         "✨ Da Sạch": "clean", "🌿 Retouch Tự Nhiên": "natural",
-        "💫 Chiều Sâu & Ánh Sáng": "depth",
+        "💫 Chiều Sâu & Ánh Sáng": "depth", "💄 Beauty Pro": "beauty",
         "🌟 Phong Cách Tạp Chí": "magazine",
         # KY
         "✨ Таза тери": "clean", "🌿 Табигый ретушь": "natural",
-        "💫 Көлөм жана жарык": "depth", "🌟 Журнал стили": "magazine",
+        "💫 Көлөм жана жарык": "depth", "💄 Beauty Pro": "beauty",
+        "🌟 Журнал стили": "magazine",
     }
     uid = message.from_user.id
-    mode_key = mode_map[message.text]
+    mode_key = mode_map.get(message.text, DEFAULT_MODE)
     _user_mode[uid] = mode_key
     mode = MODES[mode_key]
 
@@ -979,7 +983,7 @@ async def menu_sub(message: Message):
         _sa_tpl = _TSA["sub_active_msg"].get(_salang, _TSA["sub_active_msg"]["ru"])
         await message.answer(
             _sa_tpl.format(
-                plan=PLAN_NAMES.get(sub["plan_type"], sub["plan_type"]),
+                plan=get_plan_name(sub["plan_type"], _salang),
                 date=end_pretty
             ),
             reply_markup=back_menu,
@@ -1068,7 +1072,7 @@ async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
 async def callback_buy(callback: CallbackQuery, state: FSMContext):
     plan_type = callback.data.replace("buy_", "")
     amount    = PLAN_PRICES[plan_type]
-    plan_name = PLAN_NAMES[plan_type]
+    plan_name = PLAN_NAMES[plan_type]  # будет переопределено ниже
 
     await state.update_data(plan_type=plan_type)
     await state.set_state(PaymentStates.waiting_screenshot)
@@ -1118,7 +1122,7 @@ async def recv_screenshot(message: Message, state: FSMContext):
 
     user      = message.from_user
     amount    = PLAN_PRICES[plan_type]
-    plan_name = PLAN_NAMES[plan_type]
+    plan_name = PLAN_NAMES[plan_type]  # будет переопределено ниже
 
     file_id = (
         message.photo[-1].file_id if message.photo
@@ -1239,7 +1243,7 @@ async def callback_approve(callback: CallbackQuery):
         await bot.send_message(
             chat_id=user_id,
             text=_ac_tpl.format(
-                plan=PLAN_NAMES.get(plan_type, plan_type),
+                plan=get_plan_name(plan_type, _aclang),
                 date=end_date
             ),
             parse_mode="HTML",
