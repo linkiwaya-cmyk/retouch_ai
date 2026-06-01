@@ -53,7 +53,7 @@ from database import (
     TRIAL_LIMIT,
 )
 from notifications import send_expiry_notifications
-from texts import t, LANGUAGES
+from texts import t, LANGUAGES, MODES_TRANSLATED
 from database import get_user_language, set_user_language
 from broadcast import broadcast, get_all_users
 from reminders import send_reminders, RELAUNCH_MESSAGE
@@ -608,11 +608,10 @@ async def cmd_start(message: Message, state: FSMContext):
         promo_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="💎 Выбрать подписку", callback_data="open_plans")
         ]])
+        from texts import TEXTS as _TPB
+        _pblang = await get_user_language(uid)
         await message.answer(
-            "✨ <b>Нужна качественная ретушь?</b>\n\n"
-            "Retouch Lab — AI-ретушь прямо в Telegram:\n"
-            "натуральная кожа, сохранение качества, быстрый результат.\n\n"
-            "💎 от <b>990 сом/месяц</b> — без ограничений",
+            _TPB["promo_block"].get(_pblang, _TPB["promo_block"]["ru"]),
             reply_markup=promo_kb,
             parse_mode="HTML",
         )
@@ -627,7 +626,9 @@ async def menu_promo_start(message: Message, state: FSMContext):
     """Кнопка акции в главном меню — показывает акционное предложение."""
     import time as _time
     if _promo_until <= _time.time():
-        await message.answer("⏰ Акция уже завершена.", reply_markup=main_menu)
+        _plang = await get_user_language(message.from_user.id)
+        from texts import TEXTS as _TP
+        await message.answer(_TP["promo_ended"].get(_plang, "⏰ Акция уже завершена."), reply_markup=main_menu)
         return
 
     promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
@@ -640,17 +641,14 @@ async def menu_promo_start(message: Message, state: FSMContext):
     import datetime
     ends_at = datetime.datetime.fromtimestamp(_promo_until).strftime("%H:%M")
 
+    _pslang = await get_user_language(message.from_user.id)
+    from texts import TEXTS as _TPS
+    _ps_btn = _TPS["promo_buy_btn"].get(_pslang, _TPS["promo_buy_btn"]["ru"])
+    promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=_ps_btn, callback_data="buy_promo_1m")
+    ]])
     await message.answer(
-        "🔥 ——————————————— 🔥\n"
-        "<b>С Ч А С Т Л И В Ы Е</b>\n"
-        "<b>      Ч А С Ы</b>\n"
-        "🔥 ——————————————— 🔥\n\n"
-        "<i>Только сегодня — подписка на 1 месяц</i>\n\n"
-        f"💎 <b>799 сом</b>  <s>990 сом</s>  (~<b>$9</b> вместо $11)\n\n"
-        "✦ Неограниченная AI-ретушь\n"
-        "✦ 5 режимов обработки\n"
-        "✦ Оригинальное разрешение 4K / 24MP\n\n"
-        f"⏰ <b>Акция действует до {ends_at}</b>",
+        _TPS["promo_screen"].get(_pslang, _TPS["promo_screen"]["ru"]).format(ends_at=ends_at),
         reply_markup=promo_buy_kb,
         parse_mode="HTML",
     )
@@ -734,14 +732,9 @@ async def menu_before_after(message: Message):
         Path(__file__).parent / "examples",
     ]
 
-    DESCRIPTION = (
-        "✨ <b>Примеры нашей ретуши:</b>\n\n"
-        "• Натуральное выравнивание кожи\n"
-        "• Текстура и поры сохраняются\n"
-        "• Родинки и особенности остаются\n"
-        "• Полированный дорогой результат\n\n"
-        "Попробуй прямо сейчас — отправь своё фото ✨"
-    )
+    from texts import TEXTS as _TBA
+    _balang = await get_user_language(message.from_user.id)
+    DESCRIPTION = _TBA["before_after_desc"].get(_balang, _TBA["before_after_desc"]["ru"])
 
     # ── Приоритет 1: видео ────────────────────────────────────────────────────
     if video_path:
@@ -816,23 +809,10 @@ async def menu_before_after(message: Message):
 
 @dp.message(F.text == "📂 Форматы")
 async def menu_formats(message: Message):
+    from texts import TEXTS as _TFM
+    _fmlang = await get_user_language(message.from_user.id)
     await message.answer(
-        "📂 <b>Поддерживаемые форматы</b>\n\n"
-        "✦ <b>JPEG / JPG</b> — любые камеры\n"
-        "✦ <b>PNG</b> — без потерь\n"
-        "✦ <b>HEIC / HEIF</b> — iPhone / iPad\n"
-        "✦ <b>WebP</b> — веб-форматы\n\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "📐 <b>Разрешение</b>\n\n"
-        "✦ Поддержка до 4K и выше\n"
-        "✦ 24MP, 36MP, 50MP — всё принимается\n"
-        "✦ Оригинальный размер сохраняется\n"
-        "✦ Aspect ratio не изменяется\n\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "⚠️ <b>Важно</b>\n\n"
-        "Отправляй фото <b>файлом</b>, а не через галерею.\n"
-        "Telegram сжимает обычные фото до ~1200px.\n\n"
-        "📎 Скрепка → <b>Файл</b> → выбери фото",
+        _TFM["formats_text"].get(_fmlang, _TFM["formats_text"]["ru"]),
         reply_markup=back_menu,
         parse_mode="HTML",
     )
@@ -841,18 +821,10 @@ async def menu_formats(message: Message):
 @dp.message(F.text.in_({'📖 About modes', '📖 О режимах', '📖 Режимдер жөнүндө', '📖 Về các chế độ'}))
 async def menu_about_modes(message: Message):
     user_lang = await get_user_language(message.from_user.id)
+    from texts import TEXTS as _TAM
     await message.answer(
-        "📖 <b>Режимы обработки Retouch Lab</b>\n\n"
-        "✨ <b>Чистая кожа</b>\n"
-        "Убирает прыщи и дефекты. Почти не меняет лицо. Для тех кто хочет минимум изменений.\n\n"
-        "🌿 <b>Натуральная ретушь</b>\n"
-        "Лучший вариант на каждый день. Чистит кожу, сохраняет текстуру и натуральность.\n\n"
-        "💫 <b>Объём и свет</b>\n"
-        "Добавляет объём лицу, усиливает светотень. Дорогой профессиональный вид.\n\n"
-        "💄 <b>Beauty Pro</b>\n"
-        "Для Instagram и соцсетей. Красивая чистая кожа, выразительные глаза.\n\n"
-        "🌟 <b>Журнальный стиль</b>\n"
-        "Самая сильная обработка. Рекламный глянцевый эффект.",
+        _TAM["about_modes_text"].get(user_lang, _TAM["about_modes_text"]["ru"]),
+
         reply_markup=make_modes_keyboard(user_lang),
         parse_mode="HTML",
     )
@@ -885,10 +857,13 @@ async def select_mode(message: Message):
     mode = MODES[mode_key]
 
     user_lang = await get_user_language(uid)
-    from texts import TEXTS as _TM
+    from texts import TEXTS as _TM, MODES_TRANSLATED as _MT
+    _mode_tr = _MT.get(mode_key, {}).get(user_lang, _MT.get(mode_key, {}).get("ru", {}))
+    _mname = _mode_tr.get("name", mode["name"])
+    _mdesc = _mode_tr.get("desc", mode["desc"])
     mode_txt = _TM["mode_selected"].get(user_lang, _TM["mode_selected"]["ru"])
     await message.answer(
-        mode_txt.format(name=mode["name"], desc=mode["desc"]),
+        mode_txt.format(name=_mname, desc=_mdesc),
         reply_markup=make_back_to_modes(user_lang),
         parse_mode="HTML",
     )
@@ -902,26 +877,27 @@ async def menu_try_free(message: Message):
     remaining = max(0, TRIAL_LIMIT - trial_used)
 
     if has_sub:
+        _tflang = await get_user_language(uid)
+        from texts import TEXTS as _TTF
         await message.answer(
-            "💎 У вас активная подписка — обрабатывайте без ограничений!\n\n"
-            "Выберите режим обработки 👇",
-            reply_markup=modes_keyboard,
+            _TTF["try_free_has_sub"].get(_tflang, _TTF["try_free_has_sub"]["ru"]),
+            reply_markup=make_modes_keyboard(_tflang),
             parse_mode="HTML",
         )
     elif remaining > 0:
+        _trlang = await get_user_language(uid)
+        from texts import TEXTS as _TTR
         await message.answer(
-            f"🎁 <b>Вам доступно {remaining} из {TRIAL_LIMIT} бесплатных обработок</b>\n\n"
-            "Выберите режим обработки 👇",
-            reply_markup=modes_keyboard,
+            _TTR["try_free_remaining"].get(_trlang, _TTR["try_free_remaining"]["ru"]).format(n=remaining, total=TRIAL_LIMIT),
+            reply_markup=make_modes_keyboard(_trlang),
             parse_mode="HTML",
         )
     else:
+        _telang = await get_user_language(uid)
+        from texts import TEXTS as _TTE
         await message.answer(
-            "✨ <b>Бесплатные обработки использованы</b>\n\n"
-            "💡 Ретушёр берёт 300–1500 сом за одно фото.\n"
-            "Retouch Lab — 990 сом в месяц без ограничений.\n\n"
-            "⏰ Выберите тариф 👇",
-            reply_markup=plans_keyboard(),
+            _TTE["paywall_full"].get(_telang, _TTE["paywall_full"]["ru"]),
+            reply_markup=plans_keyboard(_telang),
             parse_mode="HTML",
         )
 
@@ -939,17 +915,21 @@ async def menu_try_free_dynamic(message: Message):
         current_mode = _user_mode.get(uid, DEFAULT_MODE)
         mode = MODES[current_mode]
         user_lang = await get_user_language(uid)
+        from texts import TEXTS as _TFR, MODES_TRANSLATED as _MFR
+        _mc_tr2 = _MFR.get(current_mode, {}).get(user_lang, _MFR.get(current_mode, {}).get("ru", {}))
+        _mname2 = _mc_tr2.get("name", mode["name"])
+        _tfr_tpl = _TFR["trial_free_remaining"].get(user_lang, _TFR["trial_free_remaining"]["ru"])
         await message.answer(
-            f"🎁 <b>Осталось бесплатных: {remaining} из {TRIAL_LIMIT}</b>\n\n"
-            f"✅ Текущий режим: {mode['name']}\n\n"
-            "Выберите режим или отправьте фото 📎",
+            _tfr_tpl.format(n=remaining, total=TRIAL_LIMIT, name=_mname2),
             reply_markup=make_modes_keyboard(user_lang),
             parse_mode="HTML",
         )
     else:
+        _dellang = await get_user_language(uid)
+        from texts import TEXTS as _TDEL
         await message.answer(
-            _limit_exceeded_text(),
-            reply_markup=plans_keyboard(),
+            _TDEL["paywall_full"].get(_dellang, _TDEL["paywall_full"]["ru"]),
+            reply_markup=plans_keyboard(_dellang),
             parse_mode="HTML",
         )
 
@@ -963,9 +943,11 @@ async def menu_process(message: Message):
 
     # Если нет подписки и лимит исчерпан — показываем блокировку
     if not has_sub and remaining == 0:
+        _mplang = await get_user_language(uid)
+        from texts import TEXTS as _TMP
         await message.answer(
-            _limit_exceeded_text(),
-            reply_markup=plans_keyboard(),
+            _TMP["paywall_full"].get(_mplang, _TMP["paywall_full"]["ru"]),
+            reply_markup=plans_keyboard(_mplang),
             parse_mode="HTML",
         )
         return
@@ -974,11 +956,13 @@ async def menu_process(message: Message):
     user_lang = await get_user_language(uid)
     current_mode = _user_mode.get(uid, DEFAULT_MODE)
     mode = MODES[current_mode]
+    from texts import TEXTS as _TC, MODES_TRANSLATED as _MCT
+    _mc_tr = _MCT.get(current_mode, {}).get(user_lang, _MCT.get(current_mode, {}).get("ru", {}))
+    _mcname = _mc_tr.get("name", mode["name"])
+    _mcdesc = _mc_tr.get("desc", mode["desc"])
+    _cur_tpl = _TC["current_mode"].get(user_lang, _TC["current_mode"]["ru"])
     await message.answer(
-        f"✅ <b>Текущий режим: {mode['name']}</b>\n\n"
-        f"{mode['desc']}\n\n"
-        "📎 Отправьте фото файлом (скрепка → Файл)\n"
-        "Форматы: JPG · PNG · HEIC · WebP",
+        _cur_tpl.format(name=_mcname, desc=_mcdesc),
         reply_markup=make_modes_keyboard(user_lang),
         parse_mode="HTML",
     )
@@ -990,11 +974,14 @@ async def menu_sub(message: Message):
 
     if sub:
         end_pretty = ".".join(reversed(sub["end_date"][:10].split("-")))
+        from texts import TEXTS as _TSA
+        _salang = await get_user_language(message.from_user.id)
+        _sa_tpl = _TSA["sub_active_msg"].get(_salang, _TSA["sub_active_msg"]["ru"])
         await message.answer(
-            f"💎 <b>Подписка активна</b>\n\n"
-            f"📅 Тариф: <b>{PLAN_NAMES.get(sub['plan_type'], sub['plan_type'])}</b>\n"
-            f"⏳ Действует до: <b>{end_pretty}</b>\n\n"
-            "Отправляйте фото — всё работает ✨",
+            _sa_tpl.format(
+                plan=PLAN_NAMES.get(sub["plan_type"], sub["plan_type"]),
+                date=end_pretty
+            ),
             reply_markup=back_menu,
             parse_mode="HTML",
         )
@@ -1022,7 +1009,7 @@ async def callback_open_plans(callback: CallbackQuery):
         f"📅 1 год — <b>8 990 сом</b> (~$102) · -35% 🔥\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
         "Выберите тариф 👇",
-        reply_markup=plans_keyboard(),
+        reply_markup=plans_keyboard(lang),
         parse_mode="HTML",
     )
 
@@ -1072,7 +1059,9 @@ async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
     else:
         await callback.message.answer(caption, parse_mode="HTML")
 
-    await callback.message.answer("📸 Отправьте скриншот чека 👇")
+    _cklang = await get_user_language(callback.from_user.id)
+    from texts import TEXTS as _TCK
+    await callback.message.answer(_TCK["send_check"].get(_cklang, _TCK["send_check"]["ru"]))
 
 
 @dp.callback_query(F.data.startswith("buy_"))
@@ -1106,7 +1095,9 @@ async def callback_buy(callback: CallbackQuery, state: FSMContext):
     else:
         await callback.message.answer(caption, parse_mode="HTML")
 
-    await callback.message.answer("📸 Отправьте скриншот чека 👇")
+    _cklang = await get_user_language(callback.from_user.id)
+    from texts import TEXTS as _TCK
+    await callback.message.answer(_TCK["send_check"].get(_cklang, _TCK["send_check"]["ru"]))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1119,7 +1110,9 @@ async def recv_screenshot(message: Message, state: FSMContext):
     plan_type = data.get("plan_type")
 
     if not plan_type:
-        await message.answer("Пожалуйста, выберите тариф через меню 💎 Подписка")
+        _pchlang = await get_user_language(message.from_user.id)
+        from texts import TEXTS as _TPCH
+        await message.answer(_TPCH["please_choose_plan"].get(_pchlang, _TPCH["please_choose_plan"]["ru"]))
         await state.clear()
         return
 
@@ -1240,13 +1233,14 @@ async def callback_approve(callback: CallbackQuery):
     await update_payment_status(payment_id, "approved")
 
     try:
+        from texts import TEXTS as _TAC
+        _aclang = await get_user_language(user_id)
+        _ac_tpl = _TAC["payment_activated"].get(_aclang, _TAC["payment_activated"]["ru"])
         await bot.send_message(
             chat_id=user_id,
-            text=(
-                f"✅ <b>Подписка успешно активирована!</b>\n\n"
-                f"📅 Тариф: <b>{PLAN_NAMES.get(plan_type, plan_type)}</b>\n"
-                f"⏳ Действует до: <b>{end_date}</b>\n\n"
-                "Отправляйте фото для ретуши 📸✨"
+            text=_ac_tpl.format(
+                plan=PLAN_NAMES.get(plan_type, plan_type),
+                date=end_date
             ),
             parse_mode="HTML",
         )
@@ -1283,16 +1277,11 @@ async def callback_reject(callback: CallbackQuery):
     await update_payment_status(payment_id, "rejected")
 
     try:
+        from texts import TEXTS as _TRJ
+        _rjlang = await get_user_language(user_id)
         await bot.send_message(
             chat_id=user_id,
-            text=(
-                "❌ <b>Платёж отклонён.</b>\n\n"
-                "Возможные причины:\n"
-                "• Сумма не совпадает\n"
-                "• Перевод не найден\n"
-                "• Нечёткий скриншот\n\n"
-                "Свяжитесь с поддержкой: @linkiway_support"
-            ),
+            text=_TRJ["payment_rejected"].get(_rjlang, _TRJ["payment_rejected"]["ru"]),
             parse_mode="HTML",
         )
     except Exception as e:
@@ -1343,8 +1332,9 @@ async def _quick_check(message: Message) -> bool:
 
     await log_event(message.from_user.id, "paywall_shown")
     _qlang = await get_user_language(message.from_user.id)
+    from texts import TEXTS as _TQC
     await message.answer(
-        _limit_exceeded_text(),
+        _TQC["paywall_full"].get(_qlang, _TQC["paywall_full"]["ru"]),
         reply_markup=plans_keyboard(_qlang),
         parse_mode="HTML",
     )
@@ -1370,8 +1360,9 @@ async def _can_process(message: Message) -> bool:
 
     # Лимит исчерпан
     _clang = await get_user_language(message.from_user.id)
+    from texts import TEXTS as _TCP
     await message.answer(
-        _limit_exceeded_text(),
+        _TCP["paywall_full"].get(_clang, _TCP["paywall_full"]["ru"]),
         reply_markup=plans_keyboard(_clang),
         parse_mode="HTML",
     )
@@ -1452,9 +1443,11 @@ async def _do_process(message: Message, data: bytes, filename: str):
                 parse_mode="HTML",
             )
         else:
-            await message.answer(
-                "❌ Ошибка обработки. Попробуй ещё раз.",
-                reply_markup=back_to_modes,
+            _errlang = await get_user_language(uid)
+        from texts import TEXTS as _TE
+        await message.answer(
+                _TE["process_error"].get(_errlang, _TE["process_error"]["ru"]),
+                reply_markup=make_back_to_modes(_errlang),
             )
         await alert_admin(f"pipeline упал для user={uid}\n{type(e).__name__}: {e}")
         await log_event(uid, "photo_processing_error")
@@ -1478,13 +1471,13 @@ async def _do_process(message: Message, data: bytes, filename: str):
     await log_event(uid, "photo_processed")
 
     # ── ВАУ-МОМЕНТ — показываем детали обработки ──────────────────────────────
-    wow_text = (
-        f"✅ <b>Готово!</b> Время обработки: <b>{t_total:.0f} сек</b>\n\n"
-        f"📐 Разрешение: оригинал сохранён\n"
-        f"🔍 Текстура кожи: сохранена\n"
-        f"✦ Родинки и особенности: на месте\n"
-        f"💾 Размер файла: {len(result)/1024/1024:.1f} MB\n\n"
-        f"<i>Ретушёр делал бы это {max(10, int(t_total/3))}–30 минут вручную.</i>"
+    from texts import TEXTS as _TW
+    _wlang = await get_user_language(uid)
+    _wow_tpl = _TW["wow_moment"].get(_wlang, _TW["wow_moment"]["ru"])
+    wow_text = _wow_tpl.format(
+        t=f"{t_total:.0f}",
+        size=f"{len(result)/1024/1024:.1f}",
+        mins=max(10, int(t_total/3))
     )
 
     # Считаем trial только после УСПЕШНОЙ обработки и только без подписки
@@ -1496,37 +1489,26 @@ async def _do_process(message: Message, data: bytes, filename: str):
             # Последняя бесплатная — показываем продающий экран
             await message.answer(wow_text, parse_mode="HTML")
             await log_event(uid, "paywall_shown")
+            from texts import TEXTS as _TW2
             await message.answer(
-                "💎 <b>Бесплатные обработки использованы</b>\n\n"
-                "Ты уже видел результат — натуральная ретушь\n"
-                "без потери качества и без пластика.\n\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                "💡 <b>Посчитай сам:</b>\n\n"
-                "Ретушёр берёт <b>300–1500 сом</b> за одно фото.\n"
-                "Retouch Lab — <b>990 сом в месяц</b> без ограничений.\n\n"
-                "Это окупается с первого же фото. 🎯\n\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                "🚀 <b>Ты один из первых 100 пользователей</b>\n"
-                "Ранние пользователи получают лучшую цену.\n\n"
-                "⏰ <b>Акция 48 часов:</b> месяц за <b>799 сом</b> вместо 990\n\n"
-                "Выбери тариф 👇",
-                reply_markup=plans_keyboard(),
+                _TW2["wow_last_paywall"].get(_wlang, _TW2["wow_last_paywall"]["ru"]),
+                reply_markup=plans_keyboard(_wlang),
                 parse_mode="HTML",
             )
         elif remaining == 1:
             # Осталась 1 последняя
             await message.answer(
-                wow_text + "\n\n"
-                "⚠️ <b>Осталась 1 бесплатная обработка</b>\n\n"
-                "После неё потребуется подписка.\n"
-                "Оформи заранее чтобы не прерываться 👇",
+                wow_text + "\n\n" + __import__("texts").TEXTS["trial_last_one"].get(_wlang, __import__("texts").TEXTS["trial_last_one"]["ru"]),
                 reply_markup=buy_keyboard(),
                 parse_mode="HTML",
             )
         else:
             # Первые фото — показываем вау-момент
+            from texts import TEXTS as _TR
+            _rlang = await get_user_language(uid)
+            _rem_tpl = _TR["trial_remaining"].get(_rlang, _TR["trial_remaining"]["ru"])
             await message.answer(
-                wow_text + f"\n\n🎁 Осталось бесплатных: <b>{remaining}</b>",
+                wow_text + "\n\n" + _rem_tpl.format(n=remaining),
                 parse_mode="HTML",
             )
     else:
