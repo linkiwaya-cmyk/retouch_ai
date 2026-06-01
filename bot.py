@@ -848,8 +848,18 @@ async def menu_about_modes(message: Message):
 
 
 @dp.message(F.text.in_({
+    # RU
     "✨ Чистая кожа", "🌿 Натуральная ретушь",
-    "💫 Объём и свет", "💄 Beauty Pro", "🌟 Журнальный стиль"
+    "💫 Объём и свет", "💄 Beauty Pro", "🌟 Журнальный стиль",
+    # EN
+    "✨ Clean Skin", "🌿 Natural Retouch",
+    "💫 Depth & Light", "🌟 Magazine Style",
+    # VI
+    "✨ Da Sạch", "🌿 Retouch Tự Nhiên",
+    "💫 Chiều Sâu & Ánh Sáng", "🌟 Phong Cách Tạp Chí",
+    # KY
+    "✨ Таза тери", "🌿 Табигый ретушь",
+    "💫 Көлөм жана жарык", "🌟 Журнал стили",
 }))
 async def select_mode(message: Message):
     mode_map = {
