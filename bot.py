@@ -496,26 +496,23 @@ async def cmd_start(message: Message, state: FSMContext):
     # Строим меню — кнопка обработки всегда есть
     # Если есть trial или подписка — первая кнопка ведёт к режимам
     # Если акция — отдельная кнопка акции добавляется
-    # Первая кнопка — одна главная кнопка действия
-    if has_sub:
-        main_btn = "✨ Обработать фото"
-    elif remaining > 0:
-        main_btn = f"🎁 Обработать фото (осталось {remaining} из {TRIAL_LIMIT})"
-    else:
-        main_btn = "✨ Обработать фото"
+    # Строим меню
+    menu_rows = []
 
-    menu_rows = [
-        [KeyboardButton(text=main_btn)],
-    ]
+    # Кнопка trial — только если есть бесплатные попытки
+    if not has_sub and remaining > 0:
+        menu_rows.append([KeyboardButton(text=f"🎁 Обработать фото (осталось {remaining} из {TRIAL_LIMIT})")])
 
     # Кнопка акции — только если активна и нет подписки
     if promo_active and not has_sub:
         menu_rows.append([KeyboardButton(text="🔥 Акция — 799 сом (~$9)")])
 
+    # Основные кнопки — всегда
     menu_rows += [
+        [KeyboardButton(text="✨ Обработать фото")],
         [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="💎 Подписка")],
-        [KeyboardButton(text="ℹ️ О боте"), KeyboardButton(text="💬 Поддержка")],
-        [KeyboardButton(text="🌐 Язык / Language")],
+        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text="🌐 Язык / Language")],
+        [KeyboardButton(text="ℹ️ О боте")],
     ]
 
     dynamic_menu = ReplyKeyboardMarkup(
@@ -598,10 +595,10 @@ async def menu_promo_start(message: Message, state: FSMContext):
 async def menu_language(message: Message, state: FSMContext):
     """Кнопка смены языка в главном меню."""
     kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🇰🇬 Кыргызча",   callback_data="lang_ky")],
         [InlineKeyboardButton(text="🇷🇺 Русский",    callback_data="lang_ru")],
         [InlineKeyboardButton(text="🇬🇧 English",    callback_data="lang_en")],
         [InlineKeyboardButton(text="🇻🇳 Tiếng Việt", callback_data="lang_vi")],
-        [InlineKeyboardButton(text="🇰🇬 Кыргызча",   callback_data="lang_ky")],
     ])
     await message.answer(
         "🌐 <b>Выберите язык / Choose language / Chọn ngôn ngữ / Тилди тандаңыз:</b>",
@@ -842,14 +839,49 @@ async def menu_try_free(message: Message):
 
 
 # Динамическая кнопка "Попробовать бесплатно (осталось X из 3)"
-@dp.message(F.text.startswith("🎁 Попробовать бесплатно (осталось"))
+@dp.message(F.text.startswith("🎁 Обработать фото (осталось"))
 async def menu_try_free_dynamic(message: Message):
-    await menu_try_free(message)
+    """Кнопка с остатком бесплатных — ведёт к режимам."""
+    uid = message.from_user.id
+    has_sub = bool(await check_active_subscription(uid))
+    trial_used = await get_trial_count(uid)
+    remaining = max(0, TRIAL_LIMIT - trial_used)
+
+    if has_sub or remaining > 0:
+        current_mode = _user_mode.get(uid, DEFAULT_MODE)
+        mode = MODES[current_mode]
+        await message.answer(
+            f"🎁 <b>Осталось бесплатных: {remaining} из {TRIAL_LIMIT}</b>\n\n"
+            f"✅ Текущий режим: {mode['name']}\n\n"
+            "Выберите режим или отправьте фото 📎",
+            reply_markup=modes_keyboard,
+            parse_mode="HTML",
+        )
+    else:
+        await message.answer(
+            _limit_exceeded_text(),
+            reply_markup=plans_keyboard(),
+            parse_mode="HTML",
+        )
 
 
 @dp.message(F.text.in_({"✨ Обработать фото", "📸 Обработать фото"}))
 async def menu_process(message: Message):
     uid = message.from_user.id
+    has_sub = bool(await check_active_subscription(uid))
+    trial_used = await get_trial_count(uid)
+    remaining = max(0, TRIAL_LIMIT - trial_used)
+
+    # Если нет подписки и лимит исчерпан — показываем блокировку
+    if not has_sub and remaining == 0:
+        await message.answer(
+            _limit_exceeded_text(),
+            reply_markup=plans_keyboard(),
+            parse_mode="HTML",
+        )
+        return
+
+    # Иначе — показываем режимы
     current_mode = _user_mode.get(uid, DEFAULT_MODE)
     mode = MODES[current_mode]
     await message.answer(
@@ -1793,10 +1825,10 @@ async def cmd_language(message: Message, state: FSMContext):
     """Выбор языка — доступно всем пользователям."""
     lang = await get_user_language(message.from_user.id)
     kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🇰🇬 Кыргызча",     callback_data="lang_ky")],
         [InlineKeyboardButton(text="🇷🇺 Русский",      callback_data="lang_ru")],
         [InlineKeyboardButton(text="🇬🇧 English",      callback_data="lang_en")],
         [InlineKeyboardButton(text="🇻🇳 Tiếng Việt",   callback_data="lang_vi")],
-        [InlineKeyboardButton(text="🇰🇬 Кыргызча",     callback_data="lang_ky")],
     ])
     await message.answer(
         "🌐 <b>Выберите язык / Choose language / Chọn ngôn ngữ / Тилди тандаңыз:</b>",
