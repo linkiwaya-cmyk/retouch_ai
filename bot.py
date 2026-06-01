@@ -422,6 +422,58 @@ back_to_modes = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
+
+def make_modes_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
+    """Клавиатура режимов на нужном языке."""
+    from texts import TEXTS
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=TEXTS["btn_mode_clean"][lang])],
+            [KeyboardButton(text=TEXTS["btn_mode_natural"][lang])],
+            [KeyboardButton(text=TEXTS["btn_mode_depth"][lang])],
+            [KeyboardButton(text=TEXTS["btn_mode_beauty"][lang])],
+            [KeyboardButton(text=TEXTS["btn_mode_magazine"][lang])],
+            [KeyboardButton(text=TEXTS["btn_about_modes"][lang]),
+             KeyboardButton(text=TEXTS["btn_back_main"][lang])],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def make_back_to_modes(lang: str = "ru") -> ReplyKeyboardMarkup:
+    from texts import TEXTS
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=TEXTS["btn_back_modes"][lang])]],
+        resize_keyboard=True,
+    )
+
+
+def make_main_menu(lang: str = "ru", remaining: int = 0,
+                   has_sub: bool = False, promo_active: bool = False) -> ReplyKeyboardMarkup:
+    """Главное меню на нужном языке."""
+    from texts import TEXTS
+    rows = []
+
+    # Trial кнопка — только если есть попытки
+    if not has_sub and remaining > 0:
+        process_text = TEXTS["btn_process"][lang].replace("✨ ", "")
+        rows.append([KeyboardButton(text=f"🎁 {process_text} ({remaining}/{TRIAL_LIMIT})")])
+
+    # Кнопка акции
+    if promo_active and not has_sub:
+        rows.append([KeyboardButton(text="🔥 Акция — 799 сом (~$9)")])
+
+    # Основные кнопки
+    rows += [
+        [KeyboardButton(text=TEXTS["btn_process"].get(lang, TEXTS["btn_process"]["ru"]))],
+        [KeyboardButton(text=TEXTS["btn_examples"].get(lang, TEXTS["btn_examples"]["ru"])),
+         KeyboardButton(text=TEXTS["btn_subscription"].get(lang, TEXTS["btn_subscription"]["ru"]))],
+        [KeyboardButton(text=TEXTS["btn_support"].get(lang, TEXTS["btn_support"]["ru"])),
+         KeyboardButton(text="🌐 Язык / Language")],
+        [KeyboardButton(text=TEXTS["btn_about"].get(lang, TEXTS["btn_about"]["ru"]))],
+    ]
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
 back_menu = ReplyKeyboardMarkup(
     keyboard=[[KeyboardButton(text="⬅️ Назад")]],
     resize_keyboard=True,
@@ -515,10 +567,8 @@ async def cmd_start(message: Message, state: FSMContext):
         [KeyboardButton(text="ℹ️ О боте")],
     ]
 
-    dynamic_menu = ReplyKeyboardMarkup(
-        keyboard=menu_rows,
-        resize_keyboard=True,
-    )
+    lang = await get_user_language(message.from_user.id)
+    dynamic_menu = make_main_menu(lang, remaining, has_sub, promo_active)
 
     # Баннер если есть
     banner_path = Path(__file__).parent / "start_banner.png"
@@ -595,10 +645,11 @@ async def menu_promo_start(message: Message, state: FSMContext):
 async def menu_language(message: Message, state: FSMContext):
     """Кнопка смены языка в главном меню."""
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🇰🇬 Кыргызча",   callback_data="lang_ky")],
-        [InlineKeyboardButton(text="🇷🇺 Русский",    callback_data="lang_ru")],
-        [InlineKeyboardButton(text="🇬🇧 English",    callback_data="lang_en")],
-        [InlineKeyboardButton(text="🇻🇳 Tiếng Việt", callback_data="lang_vi")],
+        [InlineKeyboardButton(text="🇰🇬 Кыргызча",          callback_data="lang_ky")],
+        [InlineKeyboardButton(text="🇷🇺 Русский",           callback_data="lang_ru")],
+        [InlineKeyboardButton(text="🇬🇧 English",           callback_data="lang_en")],
+        [InlineKeyboardButton(text="🇻🇳 Tiếng Việt",        callback_data="lang_vi")],
+        [InlineKeyboardButton(text="⬅️ Назад / Back / Кайт", callback_data="lang_back")],
     ])
     await message.answer(
         "🌐 <b>Выберите язык / Choose language / Chọn ngôn ngữ / Тилди тандаңыз:</b>",
@@ -607,23 +658,36 @@ async def menu_language(message: Message, state: FSMContext):
     )
 
 
-@dp.message(F.text.in_({"⬅️ Назад", "⬅️ Главное меню"}))
+@dp.message(F.text.in_({'⬅️ Назад', '⬅️ Башкы меню', '⬅️ Menu chính', '⬅️ Главное меню', '⬅️ Main menu'}))
 async def back(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer("Главное меню 👇", reply_markup=main_menu)
-
-
-@dp.message(F.text == "⬅️ Назад к режимам")
-async def back_to_modes_handler(message: Message, state: FSMContext):
-    """Возврат к списку режимов — НЕ в главное меню."""
+    uid = message.from_user.id
+    user_lang = await get_user_language(uid)
+    has_sub = bool(await check_active_subscription(uid))
+    trial_used = await get_trial_count(uid)
+    remaining = max(0, TRIAL_LIMIT - trial_used)
+    import time as _time
+    promo_active = _promo_until > _time.time()
     await message.answer(
-        "Выберите режим обработки 👇",
-        reply_markup=modes_keyboard,
+        "👇",
+        reply_markup=make_main_menu(user_lang, remaining, has_sub, promo_active)
     )
 
 
-@dp.message(F.text == "ℹ️ О боте")
+@dp.message(F.text.in_({'⬅️ Back to modes', '⬅️ Quay lại chế độ', '⬅️ Режимдерге кайт', '⬅️ Назад к режимам'}))
+async def back_to_modes_handler(message: Message, state: FSMContext):
+    """Возврат к списку режимов — НЕ в главное меню."""
+    user_lang = await get_user_language(message.from_user.id)
+    await message.answer(
+        "👇",
+        reply_markup=make_modes_keyboard(user_lang),
+    )
+
+
+@dp.message(F.text.in_({'ℹ️ About', 'ℹ️ Giới thiệu', 'ℹ️ Бот жөнүндө', 'ℹ️ О боте'}))
 async def menu_about(message: Message):
+    lang = await get_user_language(message.from_user.id)
+    # ABOUT_TEXT на русском для всех — переводы добавим позже
     await message.answer(
         ABOUT_TEXT,
         reply_markup=back_menu,
@@ -631,16 +695,15 @@ async def menu_about(message: Message):
     )
 
 
-@dp.message(F.text == "💬 Поддержка")
+@dp.message(F.text.in_({'💬 Колдоо', '💬 Hỗ trợ', '💬 Поддержка', '💬 Support'}))
 async def menu_support(message: Message):
-    await message.answer(
-        SUPPORT_TEXT,
-        reply_markup=back_menu,
-        parse_mode="HTML",
-    )
+    from texts import TEXTS
+    lang = await get_user_language(message.from_user.id)
+    txt = TEXTS["support_text"].get(lang, TEXTS["support_text"]["ru"])
+    await message.answer(txt, reply_markup=back_menu, parse_mode="HTML")
 
 
-@dp.message(F.text.in_({"🖼 Before / After", "🎥 Примеры до / после"}))
+@dp.message(F.text.in_({'🎥 Before / After examples', '🎥 Примеры до / после', '🎥 Мисалдар чейин / кийин', '🖼 Before / After', '🎥 Ví dụ trước / sau'}))
 async def menu_before_after(message: Message):
     from aiogram.types import InputMediaPhoto
 
@@ -760,8 +823,9 @@ async def menu_formats(message: Message):
     )
 
 
-@dp.message(F.text == "📖 О режимах")
+@dp.message(F.text.in_({'📖 About modes', '📖 О режимах', '📖 Режимдер жөнүндө', '📖 Về các chế độ'}))
 async def menu_about_modes(message: Message):
+    user_lang = await get_user_language(message.from_user.id)
     await message.answer(
         "📖 <b>Режимы обработки Retouch Lab</b>\n\n"
         "✨ <b>Чистая кожа</b>\n"
@@ -774,7 +838,7 @@ async def menu_about_modes(message: Message):
         "Для Instagram и соцсетей. Красивая чистая кожа, выразительные глаза.\n\n"
         "🌟 <b>Журнальный стиль</b>\n"
         "Самая сильная обработка. Рекламный глянцевый эффект.",
-        reply_markup=modes_keyboard,
+        reply_markup=make_modes_keyboard(user_lang),
         parse_mode="HTML",
     )
 
@@ -785,11 +849,20 @@ async def menu_about_modes(message: Message):
 }))
 async def select_mode(message: Message):
     mode_map = {
-        "✨ Чистая кожа":       "clean",
-        "🌿 Натуральная ретушь": "natural",
-        "💫 Объём и свет":      "depth",
-        "💄 Beauty Pro":        "beauty",
-        "🌟 Журнальный стиль":  "magazine",
+        # RU
+        "✨ Чистая кожа": "clean", "🌿 Натуральная ретушь": "natural",
+        "💫 Объём и свет": "depth", "💄 Beauty Pro": "beauty",
+        "🌟 Журнальный стиль": "magazine",
+        # EN
+        "✨ Clean Skin": "clean", "🌿 Natural Retouch": "natural",
+        "💫 Depth & Light": "depth", "🌟 Magazine Style": "magazine",
+        # VI
+        "✨ Da Sạch": "clean", "🌿 Retouch Tự Nhiên": "natural",
+        "💫 Chiều Sâu & Ánh Sáng": "depth",
+        "🌟 Phong Cách Tạp Chí": "magazine",
+        # KY
+        "✨ Таза тери": "clean", "🌿 Табигый ретушь": "natural",
+        "💫 Көлөм жана жарык": "depth", "🌟 Журнал стили": "magazine",
     }
     uid = message.from_user.id
     mode_key = mode_map[message.text]
@@ -850,11 +923,12 @@ async def menu_try_free_dynamic(message: Message):
     if has_sub or remaining > 0:
         current_mode = _user_mode.get(uid, DEFAULT_MODE)
         mode = MODES[current_mode]
+        user_lang = await get_user_language(uid)
         await message.answer(
             f"🎁 <b>Осталось бесплатных: {remaining} из {TRIAL_LIMIT}</b>\n\n"
             f"✅ Текущий режим: {mode['name']}\n\n"
             "Выберите режим или отправьте фото 📎",
-            reply_markup=modes_keyboard,
+            reply_markup=make_modes_keyboard(user_lang),
             parse_mode="HTML",
         )
     else:
@@ -865,7 +939,7 @@ async def menu_try_free_dynamic(message: Message):
         )
 
 
-@dp.message(F.text.in_({"✨ Обработать фото", "📸 Обработать фото"}))
+@dp.message(F.text.in_({'📸 Обработать фото', '✨ Сүрөттү иштет', '✨ Обработать фото', '✨ Xử lý ảnh', '✨ Process photo'}))
 async def menu_process(message: Message):
     uid = message.from_user.id
     has_sub = bool(await check_active_subscription(uid))
@@ -882,19 +956,20 @@ async def menu_process(message: Message):
         return
 
     # Иначе — показываем режимы
+    user_lang = await get_user_language(uid)
     current_mode = _user_mode.get(uid, DEFAULT_MODE)
     mode = MODES[current_mode]
     await message.answer(
         f"✅ <b>Текущий режим: {mode['name']}</b>\n\n"
         f"{mode['desc']}\n\n"
-        "Выберите другой режим или отправьте фото 📎\n"
+        "📎 Отправьте фото файлом (скрепка → Файл)\n"
         "Форматы: JPG · PNG · HEIC · WebP",
-        reply_markup=modes_keyboard,
+        reply_markup=make_modes_keyboard(user_lang),
         parse_mode="HTML",
     )
 
 
-@dp.message(F.text == "💎 Подписка")
+@dp.message(F.text.in_({'💎 Đăng ký', '💎 Subscription', '💎 Жазылуу', '💎 Подписка'}))
 async def menu_sub(message: Message):
     sub = await check_active_subscription(message.from_user.id)
 
@@ -1839,49 +1914,53 @@ async def cmd_language(message: Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("lang_"))
 async def callback_set_language(callback: CallbackQuery):
-    """Устанавливает язык пользователя."""
-    lang = callback.data.replace("lang_", "")
-    if lang not in LANGUAGES:
+    """Устанавливает язык пользователя или возвращает назад."""
+    uid = callback.from_user.id
+    action = callback.data.replace("lang_", "")
+
+    # Кнопка "Назад" — возвращаем в главное меню без смены языка
+    if action == "back":
+        await callback.answer()
+        await callback.message.delete()
+        lang = await get_user_language(uid)
+        has_sub = bool(await check_active_subscription(uid))
+        trial_used = await get_trial_count(uid)
+        remaining = max(0, TRIAL_LIMIT - trial_used)
+        import time as _time
+        promo_active = _promo_until > _time.time()
+        await callback.message.answer(
+            "👇",
+            reply_markup=make_main_menu(lang, remaining, has_sub, promo_active)
+        )
+        return
+
+    # Устанавливаем язык
+    if action not in LANGUAGES:
         await callback.answer("Unknown language")
         return
 
-    uid = callback.from_user.id
+    lang = action
     await set_user_language(uid, lang)
     await callback.answer()
 
-    lang_name = LANGUAGES[lang]
-    await callback.message.edit_text(
-        f"✅ {lang_name}",
-        parse_mode="HTML",
-    )
+    # Закрываем меню языков
+    try:
+        await callback.message.edit_text(
+            f"✅ {LANGUAGES[lang]}",
+            parse_mode="HTML",
+        )
+    except Exception:
+        pass
 
-    # Показываем приветствие на выбранном языке
+    # Строим меню на новом языке
     has_sub = bool(await check_active_subscription(uid))
     trial_used = await get_trial_count(uid)
     remaining = max(0, TRIAL_LIMIT - trial_used)
     import time as _time
     promo_active = _promo_until > _time.time()
+    new_menu = make_main_menu(lang, remaining, has_sub, promo_active)
 
-    if has_sub:
-        trial_btn = t("btn_process", lang)
-    elif remaining > 0:
-        trial_btn = t("btn_try_free", lang, n=remaining)
-    elif promo_active:
-        trial_btn = "🔥 Акция — 799 сом (~$9)"
-    else:
-        trial_btn = t("btn_buy_sub", lang)
-
-    dynamic_menu = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=trial_btn)],
-            [KeyboardButton(text=t("btn_examples", lang)),
-             KeyboardButton(text=t("btn_subscription", lang))],
-            [KeyboardButton(text=t("btn_about", lang)),
-             KeyboardButton(text=t("btn_support", lang))],
-        ],
-        resize_keyboard=True,
-    )
-
+    # Баннер если есть
     banner_path = Path(__file__).parent / "start_banner.png"
     if banner_path.exists():
         try:
@@ -1893,9 +1972,11 @@ async def callback_set_language(callback: CallbackQuery):
         except Exception:
             pass
 
+    # Приветствие на новом языке
+    from texts import TEXTS
     await callback.message.answer(
-        t("welcome", lang),
-        reply_markup=dynamic_menu,
+        TEXTS["welcome"].get(lang, TEXTS["welcome"]["ru"]),
+        reply_markup=new_menu,
         parse_mode="HTML",
     )
 
