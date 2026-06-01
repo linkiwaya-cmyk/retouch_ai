@@ -64,6 +64,7 @@ async def _ensure_tables(db):
         "ALTER TABLE users ADD COLUMN last_active TEXT",
         "ALTER TABLE users ADD COLUMN reminder_sent INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN is_inactive INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'ru'",
     ]:
         try:
             await db.execute(sql)
@@ -331,6 +332,29 @@ async def get_analytics_summary() -> dict:
             if shown > 0 else 0
         )
         return result
+
+
+async def get_user_language(telegram_id: int) -> str:
+    """Возвращает язык пользователя."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await _ensure_tables(db)
+        async with db.execute(
+            "SELECT language FROM users WHERE telegram_id = ?",
+            (telegram_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row and row[0] else "ru"
+
+
+async def set_user_language(telegram_id: int, language: str):
+    """Устанавливает язык пользователя."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await _ensure_tables(db)
+        await db.execute(
+            "UPDATE users SET language = ? WHERE telegram_id = ?",
+            (language, telegram_id)
+        )
+        await db.commit()
 
 
 async def update_last_active(telegram_id: int):
