@@ -480,24 +480,39 @@ back_menu = ReplyKeyboardMarkup(
 )
 
 
-def plans_keyboard() -> InlineKeyboardMarkup:
+def plans_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Кнопки тарифов на языке пользователя."""
+    if lang == "en":
+        labels = [
+            ("📅 1 month — $11",              "buy_1m"),
+            ("📅 3 months — $28 · -15%",       "buy_3m"),
+            ("📅 6 months — $57 · -25%",       "buy_6m"),
+            ("📅 1 year — $102 · -35% 🔥",     "buy_1y"),
+        ]
+    elif lang == "vi":
+        labels = [
+            ("📅 1 tháng — 280,000 VND (~$11)",          "buy_1m"),
+            ("📅 3 tháng — 710,000 VND (~$28) · -15%",   "buy_3m"),
+            ("📅 6 tháng — 1,450,000 VND (~$57) · -25%", "buy_6m"),
+            ("📅 1 năm — 2,600,000 VND (~$102) · -35% 🔥","buy_1y"),
+        ]
+    elif lang == "ky":
+        labels = [
+            ("📅 1 ай — 990 сом (~$11)",              "buy_1m"),
+            ("📅 3 ай — 2,490 сом (~$28) · -15%",     "buy_3m"),
+            ("📅 6 ай — 4,990 сом (~$57) · -25%",     "buy_6m"),
+            ("📅 1 жыл — 8,990 сом (~$102) · -35% 🔥","buy_1y"),
+        ]
+    else:  # ru
+        labels = [
+            (f"📅 1 месяц — {PLAN_PRICES['1m']:,} сом (~$11)",       "buy_1m"),
+            (f"📅 3 месяца — {PLAN_PRICES['3m']:,} сом (~$28) · -15%","buy_3m"),
+            (f"📅 6 месяцев — {PLAN_PRICES['6m']:,} сом (~$57) · -25%","buy_6m"),
+            (f"📅 1 год — {PLAN_PRICES['1y']:,} сом (~$102) · -35% 🔥","buy_1y"),
+        ]
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text=f"📅 1 месяц — {PLAN_PRICES['1m']:,} сом (~$11)",
-            callback_data="buy_1m",
-        )],
-        [InlineKeyboardButton(
-            text=f"📅 3 месяца — {PLAN_PRICES['3m']:,} сом (~$28) · -15%",
-            callback_data="buy_3m",
-        )],
-        [InlineKeyboardButton(
-            text=f"📅 6 месяцев — {PLAN_PRICES['6m']:,} сом (~$57) · -25%",
-            callback_data="buy_6m",
-        )],
-        [InlineKeyboardButton(
-            text=f"📅 1 год — {PLAN_PRICES['1y']:,} сом (~$102) · -35% 🔥",
-            callback_data="buy_1y",
-        )],
+        [InlineKeyboardButton(text=text, callback_data=cb)]
+        for text, cb in labels
     ])
 
 
@@ -644,15 +659,16 @@ async def menu_promo_start(message: Message, state: FSMContext):
 @dp.message(F.text == "🌐 Язык / Language")
 async def menu_language(message: Message, state: FSMContext):
     """Кнопка смены языка в главном меню."""
+    lang = await get_user_language(message.from_user.id)
+    from texts import TEXTS
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🇰🇬 Кыргызча",          callback_data="lang_ky")],
-        [InlineKeyboardButton(text="🇷🇺 Русский",           callback_data="lang_ru")],
-        [InlineKeyboardButton(text="🇬🇧 English",           callback_data="lang_en")],
-        [InlineKeyboardButton(text="🇻🇳 Tiếng Việt",        callback_data="lang_vi")],
-        [InlineKeyboardButton(text="⬅️ Назад / Back / Кайт", callback_data="lang_back")],
+        [InlineKeyboardButton(text="🇰🇬 Кыргызча",   callback_data="lang_ky")],
+        [InlineKeyboardButton(text="🇷🇺 Русский",    callback_data="lang_ru")],
+        [InlineKeyboardButton(text="🇬🇧 English",    callback_data="lang_en")],
+        [InlineKeyboardButton(text="🇻🇳 Tiếng Việt", callback_data="lang_vi")],
     ])
     await message.answer(
-        "🌐 <b>Выберите язык / Choose language / Chọn ngôn ngữ / Тилди тандаңыз:</b>",
+        TEXTS["choose_lang"].get(lang, TEXTS["choose_lang"]["ru"]),
         reply_markup=kb,
         parse_mode="HTML",
     )
@@ -668,8 +684,9 @@ async def back(message: Message, state: FSMContext):
     remaining = max(0, TRIAL_LIMIT - trial_used)
     import time as _time
     promo_active = _promo_until > _time.time()
+    from texts import TEXTS as _TB
     await message.answer(
-        "👇",
+        _TB["main_menu_title"].get(user_lang, "Главное меню"),
         reply_markup=make_main_menu(user_lang, remaining, has_sub, promo_active)
     )
 
@@ -686,13 +703,10 @@ async def back_to_modes_handler(message: Message, state: FSMContext):
 
 @dp.message(F.text.in_({'ℹ️ About', 'ℹ️ Giới thiệu', 'ℹ️ Бот жөнүндө', 'ℹ️ О боте'}))
 async def menu_about(message: Message):
+    from texts import TEXTS
     lang = await get_user_language(message.from_user.id)
-    # ABOUT_TEXT на русском для всех — переводы добавим позже
-    await message.answer(
-        ABOUT_TEXT,
-        reply_markup=back_menu,
-        parse_mode="HTML",
-    )
+    txt = TEXTS["about_full"].get(lang, TEXTS["about_full"]["ru"])
+    await message.answer(txt, reply_markup=back_menu, parse_mode="HTML")
 
 
 @dp.message(F.text.in_({'💬 Колдоо', '💬 Hỗ trợ', '💬 Поддержка', '💬 Support'}))
@@ -791,9 +805,10 @@ async def menu_before_after(message: Message):
         return
 
     # ── Fallback: нет ни видео ни фото ───────────────────────────────────────
+    from texts import TEXTS
+    _lang = await get_user_language(message.from_user.id)
     await message.answer(
-        "🎥 Примеры временно обновляются.\n\n"
-        + DESCRIPTION,
+        TEXTS["examples_updating"].get(_lang, TEXTS["examples_updating"]["ru"]),
         reply_markup=back_menu,
         parse_mode="HTML",
     )
@@ -869,12 +884,12 @@ async def select_mode(message: Message):
     _user_mode[uid] = mode_key
     mode = MODES[mode_key]
 
+    user_lang = await get_user_language(uid)
+    from texts import TEXTS as _TM
+    mode_txt = _TM["mode_selected"].get(user_lang, _TM["mode_selected"]["ru"])
     await message.answer(
-        f"✅ <b>Режим выбран: {mode['name']}</b>\n\n"
-        f"{mode['desc']}\n\n"
-        "📎 Отправьте фото <b>файлом</b> (скрепка → Файл)\n"
-        "Форматы: JPG · PNG · HEIC · WebP",
-        reply_markup=back_to_modes,
+        mode_txt.format(name=mode["name"], desc=mode["desc"]),
+        reply_markup=make_back_to_modes(user_lang),
         parse_mode="HTML",
     )
 
@@ -985,58 +1000,10 @@ async def menu_sub(message: Message):
         )
         return
 
+    from texts import TEXTS as _TSP
     lang = await get_user_language(message.from_user.id)
-    if lang == "en":
-        plans_text = (
-            "💎 <b>Retouch Lab Subscription</b>\n\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📅 1 month — <b>$11</b>\n"
-            "📅 3 months — <b>$28</b> · -15%\n"
-            "📅 6 months — <b>$57</b> · -25%\n"
-            "📅 1 year — <b>$102</b> · -35% 🔥\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "💎 Payment via USDT (TRC20)\n\n"
-            "Choose a plan 👇"
-        )
-    elif lang == "vi":
-        plans_text = (
-            "💎 <b>Đăng ký Retouch Lab</b>\n\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📅 1 tháng — <b>280,000 VND</b> (~$11)\n"
-            "📅 3 tháng — <b>710,000 VND</b> (~$28) · -15%\n"
-            "📅 6 tháng — <b>1,450,000 VND</b> (~$57) · -25%\n"
-            "📅 1 năm — <b>2,600,000 VND</b> (~$102) · -35% 🔥\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "🏦 Thanh toán qua Vietcombank\n\n"
-            "Chọn gói 👇"
-        )
-    elif lang == "ky":
-        plans_text = (
-            "💎 <b>Retouch Lab жазылуусу</b>\n\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📅 1 ай — <b>990 сом</b> (~$11)\n"
-            "📅 3 ай — <b>2 490 сом</b> (~$28) · -15%\n"
-            "📅 6 ай — <b>4 990 сом</b> (~$57) · -25%\n"
-            "📅 1 жыл — <b>8 990 сом</b> (~$102) · -35% 🔥\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            "Тариф тандаңыз 👇"
-        )
-    else:
-        plans_text = (
-            "💎 <b>Подписка Retouch Lab</b>\n\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📅 1 месяц — <b>990 сом</b> (~$11)\n"
-            "📅 3 месяца — <b>2 490 сом</b> (~$28) · -15%\n"
-            "📅 6 месяцев — <b>4 990 сом</b> (~$57) · -25%\n"
-            "📅 1 год — <b>8 990 сом</b> (~$102) · -35% 🔥\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            "Выберите тариф 👇"
-        )
-    await message.answer(
-        plans_text,
-        reply_markup=plans_keyboard(),
-        parse_mode="HTML",
-    )
+    plans_text = _TSP["sub_plans"].get(lang, _TSP["sub_plans"]["ru"])
+    await message.answer(plans_text, reply_markup=plans_keyboard(lang), parse_mode="HTML")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1213,10 +1180,10 @@ async def recv_screenshot(message: Message, state: FSMContext):
 
     # ── Сначала отвечаем пользователю — он НЕ видит admin кнопки ─────────────
     await state.clear()
+    from texts import TEXTS as _TS
+    _slang = await get_user_language(message.from_user.id)
     await message.answer(
-        "✅ <b>Скриншот получен!</b>\n\n"
-        "Проверяем оплату — подписка активируется\n"
-        "в течение нескольких минут 💎",
+        _TS["screenshot_received"].get(_slang, _TS["screenshot_received"]["ru"]),
         parse_mode="HTML",
     )
 
@@ -1375,9 +1342,10 @@ async def _quick_check(message: Message) -> bool:
         return True
 
     await log_event(message.from_user.id, "paywall_shown")
+    _qlang = await get_user_language(message.from_user.id)
     await message.answer(
         _limit_exceeded_text(),
-        reply_markup=plans_keyboard(),
+        reply_markup=plans_keyboard(_qlang),
         parse_mode="HTML",
     )
     return False
@@ -1401,9 +1369,10 @@ async def _can_process(message: Message) -> bool:
         return True
 
     # Лимит исчерпан
+    _clang = await get_user_language(message.from_user.id)
     await message.answer(
         _limit_exceeded_text(),
-        reply_markup=plans_keyboard(),
+        reply_markup=plans_keyboard(_clang),
         parse_mode="HTML",
     )
     return False
@@ -1461,7 +1430,9 @@ async def _do_process(message: Message, data: bytes, filename: str):
     # Логируем событие
     await log_event(uid, "photo_processing_started")
 
-    status = await message.answer("⏳ Обрабатываю фото...")
+    from texts import TEXTS as _TEXTS
+    _ulang = await get_user_language(uid)
+    status = await message.answer(_TEXTS["processing_msg"].get(_ulang, "⏳ Обрабатываю фото..."))
 
     try:
         # Берём пресет режима пользователя
@@ -1606,8 +1577,10 @@ async def recv_photo(message: Message, state: FSMContext):
         return
 
     # Обычное фото — НЕ обрабатываем, НЕ тратим лимит, НЕ ставим в очередь
+    from texts import TEXTS as _T
+    _bl = await get_user_language(message.from_user.id)
     await message.answer(
-        PHOTO_BLOCKED_TEXT,
+        _T["photo_blocked"].get(_bl, _T["photo_blocked"]["ru"]),
         reply_markup=back_menu,
         parse_mode="HTML",
     )
@@ -1914,41 +1887,20 @@ async def cmd_language(message: Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("lang_"))
 async def callback_set_language(callback: CallbackQuery):
-    """Устанавливает язык пользователя или возвращает назад."""
+    """Устанавливает язык и сразу показывает главное меню."""
     uid = callback.from_user.id
-    action = callback.data.replace("lang_", "")
+    lang = callback.data.replace("lang_", "")
 
-    # Кнопка "Назад" — возвращаем в главное меню без смены языка
-    if action == "back":
+    if lang not in LANGUAGES:
         await callback.answer()
-        await callback.message.delete()
-        lang = await get_user_language(uid)
-        has_sub = bool(await check_active_subscription(uid))
-        trial_used = await get_trial_count(uid)
-        remaining = max(0, TRIAL_LIMIT - trial_used)
-        import time as _time
-        promo_active = _promo_until > _time.time()
-        await callback.message.answer(
-            "👇",
-            reply_markup=make_main_menu(lang, remaining, has_sub, promo_active)
-        )
         return
 
-    # Устанавливаем язык
-    if action not in LANGUAGES:
-        await callback.answer("Unknown language")
-        return
-
-    lang = action
     await set_user_language(uid, lang)
     await callback.answer()
 
-    # Закрываем меню языков
+    # Закрываем инлайн меню
     try:
-        await callback.message.edit_text(
-            f"✅ {LANGUAGES[lang]}",
-            parse_mode="HTML",
-        )
+        await callback.message.delete()
     except Exception:
         pass
 
@@ -1972,7 +1924,7 @@ async def callback_set_language(callback: CallbackQuery):
         except Exception:
             pass
 
-    # Приветствие на новом языке
+    # Сразу главное меню на новом языке
     from texts import TEXTS
     await callback.message.answer(
         TEXTS["welcome"].get(lang, TEXTS["welcome"]["ru"]),
