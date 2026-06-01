@@ -481,6 +481,20 @@ back_menu = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
+BACK_TEXTS = {
+    "ru": "⬅️ Назад",
+    "en": "⬅️ Back",
+    "vi": "⬅️ Quay lại",
+    "ky": "⬅️ Артка",
+}
+
+def make_back_menu(lang: str = "ru") -> ReplyKeyboardMarkup:
+    """Кнопка Назад на языке пользователя."""
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=BACK_TEXTS.get(lang, "⬅️ Назад"))]],
+        resize_keyboard=True,
+    )
+
 
 def plans_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """Кнопки тарифов на языке пользователя."""
@@ -674,7 +688,7 @@ async def menu_language(message: Message, state: FSMContext):
     )
 
 
-@dp.message(F.text.in_({'⬅️ Назад', '⬅️ Башкы меню', '⬅️ Menu chính', '⬅️ Главное меню', '⬅️ Main menu'}))
+@dp.message(F.text.in_({'⬅️ Назад', '⬅️ Back', '⬅️ Quay lại', '⬅️ Артка', '⬅️ Башкы меню', '⬅️ Menu chính', '⬅️ Главное меню', '⬅️ Main menu'}))
 async def back(message: Message, state: FSMContext):
     await state.clear()
     uid = message.from_user.id
@@ -695,8 +709,9 @@ async def back(message: Message, state: FSMContext):
 async def back_to_modes_handler(message: Message, state: FSMContext):
     """Возврат к списку режимов — НЕ в главное меню."""
     user_lang = await get_user_language(message.from_user.id)
+    from texts import TEXTS as _TBM
     await message.answer(
-        "👇",
+        _TBM["choose_mode"].get(user_lang, _TBM["choose_mode"]["ru"]),
         reply_markup=make_modes_keyboard(user_lang),
     )
 
@@ -706,7 +721,7 @@ async def menu_about(message: Message):
     from texts import TEXTS
     lang = await get_user_language(message.from_user.id)
     txt = TEXTS["about_full"].get(lang, TEXTS["about_full"]["ru"])
-    await message.answer(txt, reply_markup=back_menu, parse_mode="HTML")
+    await message.answer(txt, reply_markup=make_back_menu(lang), parse_mode="HTML")
 
 
 @dp.message(F.text.in_({'💬 Колдоо', '💬 Hỗ trợ', '💬 Поддержка', '💬 Support'}))
@@ -793,7 +808,7 @@ async def menu_before_after(message: Message):
                 for i, p in enumerate(photo_files)
             ]
             await message.answer_media_group(media=media)
-            await message.answer("👆", reply_markup=back_menu)
+            pass  # убрали лишний стикер
         except Exception as e:
             logger.error("[BEFORE_AFTER] photo send failed: %s", e)
             await message.answer(DESCRIPTION, reply_markup=back_menu, parse_mode="HTML")
@@ -815,7 +830,7 @@ async def menu_formats(message: Message):
     _fmlang = await get_user_language(message.from_user.id)
     await message.answer(
         _TFM["formats_text"].get(_fmlang, _TFM["formats_text"]["ru"]),
-        reply_markup=back_menu,
+        reply_markup=make_back_menu(_fmlang),
         parse_mode="HTML",
     )
 
