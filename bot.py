@@ -34,6 +34,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 
 from pipeline import process_image
+# Цены в разных валютах
+PLAN_PRICES_USD = {"1m": 11, "3m": 28, "6m": 57, "1y": 102}
+PLAN_PRICES_VND = {"1m": 280000, "3m": 710000, "6m": 1450000, "1y": 2600000}
+
 from database import (
     init_db,
     add_user,
@@ -49,6 +53,8 @@ from database import (
     TRIAL_LIMIT,
 )
 from notifications import send_expiry_notifications
+from texts import t, LANGUAGES
+from database import get_user_language, set_user_language
 from broadcast import broadcast, get_all_users
 from reminders import send_reminders, RELAUNCH_MESSAGE
 from database import update_last_active, reset_reminder_flag
@@ -263,9 +269,78 @@ _promo_until: float = 0.0  # unix timestamp конца акции
 # GROUP_CHAT_ID — отдельная группа куда приходят чеки с кнопками approve/reject
 # Получить: создай группу → добавь бота → напиши /start → смотри getUpdates
 GROUP_CHAT_ID  = int(os.getenv("GROUP_CHAT_ID", os.getenv("ADMIN_CHAT_ID", "532189427")))
-QR_PATH        = Path(__file__).parent / "qr_code.png"
-MBANK_PHONE    = "+996 (500) 070 759"
-MBANK_NAME     = "АЛИНА А."
+QR_PATH         = Path(__file__).parent / "qr_code.png"       # MBank RU/KY
+QR_PATH_VI      = Path(__file__).parent / "qr_code_vi.png"    # Vietcombank VI
+QR_PATH_USDT    = Path(__file__).parent / "qr_code_usdt.png"  # USDT EN
+USDT_ADDRESS    = "TVjWpiVhRBDQKKFBn8KzP4Mc7noRYoLFFZ"
+MBANK_PHONE     = "+996 (500) 070 759"
+MBANK_NAME      = "АЛИНА А."
+VIETCOMBANK_NUM = "QRGD00010667377180"
+VIETCOMBANK_NAME = "ABDURASULOVA ALINA"
+
+
+def get_qr_path(lang: str) -> Path:
+    """Возвращает нужный QR в зависимости от языка."""
+    if lang == "vi" and QR_PATH_VI.exists():
+        return QR_PATH_VI
+    if lang == "en" and QR_PATH_USDT.exists():
+        return QR_PATH_USDT
+    return QR_PATH
+
+
+def get_payment_caption(lang: str, plan_name: str, amount_som: int,
+                         amount_usd: int, amount_vnd: int) -> str:
+    """Текст инструкции по оплате на нужном языке."""
+    if lang == "vi":
+        return (
+            f"💳 <b>Thanh toán: {plan_name} — {amount_vnd:,} VND (~${amount_usd})</b>\n\n"
+            f"Chuyển <b>{amount_vnd:,} VND</b> qua Vietcombank:\n\n"
+            f"👤 <b>{VIETCOMBANK_NAME}</b>\n"
+            f"🏦 Số TK: <b>{VIETCOMBANK_NUM}</b>\n"
+            f"🏢 CN Nha Trang\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📌 <b>Hướng dẫn:</b>\n"
+            "1. Mở ứng dụng ngân hàng\n"
+            "2. Quét mã QR hoặc chuyển khoản thủ công\n"
+            f"3. Số tiền: <b>{amount_vnd:,} VND</b>\n"
+            "4. Ghi chú: <b>retouch</b>\n"
+            "5. Gửi ảnh chụp màn hình tại đây 👇\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⏳ Đăng ký sẽ được kích hoạt trong vài phút."
+        )
+    elif lang == "en":
+        return (
+            f"💳 <b>Payment: {plan_name} — ${amount_usd}</b>\n\n"
+            f"Send <b>${amount_usd} USDT</b> (TRC20):\n\n"
+            f"💎 <b>Wallet address:</b>\n"
+            f"<code>{USDT_ADDRESS}</code>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📌 <b>How to pay:</b>\n"
+            "1. Open your crypto wallet\n"
+            "2. Send USDT via TRC20 network\n"
+            f"3. Amount: <b>${amount_usd} USDT</b>\n"
+            "4. Send screenshot here 👇\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⚠️ <b>Important:</b> use TRC20 network only!\n"
+            "⏳ Subscription activates within a few minutes."
+        )
+    else:
+        # RU / KY — MBank
+        return (
+            f"💳 <b>Оплата: {plan_name} — {amount_som:,} сом (~${amount_usd})</b>\n\n"
+            f"Переведите <b>{amount_som:,} сом</b> на MBank:\n\n"
+            f"👤 <b>{MBANK_NAME}</b>\n"
+            f"📱 <b>{MBANK_PHONE}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📌 <b>Как оплатить:</b>\n"
+            "1. Откройте MBank\n"
+            "2. Переводы → По номеру телефона\n"
+            f"3. Сумма: <b>{amount_som:,} сом (~${amount_usd})</b>\n"
+            "4. Переведите и сохраните чек\n"
+            "5. Отправьте скриншот сюда 👇\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⏳ Подписка активируется в течение нескольких минут."
+        )
 
 # Очередь обработки — каждый пользователь имеет свою очередь
 # Фото обрабатываются по одному, остальные ждут автоматически
@@ -305,6 +380,10 @@ dp  = Dispatcher(storage=MemoryStorage())
 
 
 # ── FSM ───────────────────────────────────────────────────────────────────────
+class LanguageStates(StatesGroup):
+    choosing = State()
+
+
 class PaymentStates(StatesGroup):
     waiting_screenshot = State()
 
@@ -320,7 +399,7 @@ main_menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="✨ Обработать фото")],
         [KeyboardButton(text="🎁 Попробовать бесплатно"), KeyboardButton(text="💎 Подписка")],
         [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="ℹ️ О боте")],
-        [KeyboardButton(text="💬 Поддержка")],
+        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text="🌐 Язык / Language")],
     ],
     resize_keyboard=True,
 )
@@ -388,6 +467,12 @@ async def cmd_start(message: Message, state: FSMContext):
         username=message.from_user.username,
         first_name=message.from_user.first_name,
     )
+    # Проверяем установлен ли язык
+    lang = await get_user_language(message.from_user.id)
+    if not lang or lang == "ru":
+        # Показываем выбор языка при первом запуске
+        # (существующим пользователям — сразу русский)
+        pass  # язык уже ru по умолчанию
     # Динамическое приветствие
     uid = message.from_user.id
     has_sub = bool(await check_active_subscription(uid))
@@ -408,12 +493,33 @@ async def cmd_start(message: Message, state: FSMContext):
     else:
         trial_btn = "💎 Купить подписку"
 
+    # Строим меню — кнопка обработки всегда есть
+    # Если есть trial или подписка — первая кнопка ведёт к режимам
+    # Если акция — отдельная кнопка акции добавляется
+    # Первая кнопка — одна главная кнопка действия
+    if has_sub:
+        main_btn = "✨ Обработать фото"
+    elif remaining > 0:
+        main_btn = f"🎁 Обработать фото (осталось {remaining} из {TRIAL_LIMIT})"
+    else:
+        main_btn = "✨ Обработать фото"
+
+    menu_rows = [
+        [KeyboardButton(text=main_btn)],
+    ]
+
+    # Кнопка акции — только если активна и нет подписки
+    if promo_active and not has_sub:
+        menu_rows.append([KeyboardButton(text="🔥 Акция — 799 сом (~$9)")])
+
+    menu_rows += [
+        [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="💎 Подписка")],
+        [KeyboardButton(text="ℹ️ О боте"), KeyboardButton(text="💬 Поддержка")],
+        [KeyboardButton(text="🌐 Язык / Language")],
+    ]
+
     dynamic_menu = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=trial_btn)],
-            [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="💎 Подписка")],
-            [KeyboardButton(text="ℹ️ О боте"), KeyboardButton(text="💬 Поддержка")],
-        ],
+        keyboard=menu_rows,
         resize_keyboard=True,
     )
 
@@ -484,6 +590,22 @@ async def menu_promo_start(message: Message, state: FSMContext):
         "✦ Оригинальное разрешение 4K / 24MP\n\n"
         f"⏰ <b>Акция действует до {ends_at}</b>",
         reply_markup=promo_buy_kb,
+        parse_mode="HTML",
+    )
+
+
+@dp.message(F.text == "🌐 Язык / Language")
+async def menu_language(message: Message, state: FSMContext):
+    """Кнопка смены языка в главном меню."""
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🇷🇺 Русский",    callback_data="lang_ru")],
+        [InlineKeyboardButton(text="🇬🇧 English",    callback_data="lang_en")],
+        [InlineKeyboardButton(text="🇻🇳 Tiếng Việt", callback_data="lang_vi")],
+        [InlineKeyboardButton(text="🇰🇬 Кыргызча",   callback_data="lang_ky")],
+    ])
+    await message.answer(
+        "🌐 <b>Выберите язык / Choose language / Chọn ngôn ngữ / Тилди тандаңыз:</b>",
+        reply_markup=kb,
         parse_mode="HTML",
     )
 
@@ -756,15 +878,55 @@ async def menu_sub(message: Message):
         )
         return
 
+    lang = await get_user_language(message.from_user.id)
+    if lang == "en":
+        plans_text = (
+            "💎 <b>Retouch Lab Subscription</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📅 1 month — <b>$11</b>\n"
+            "📅 3 months — <b>$28</b> · -15%\n"
+            "📅 6 months — <b>$57</b> · -25%\n"
+            "📅 1 year — <b>$102</b> · -35% 🔥\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "💎 Payment via USDT (TRC20)\n\n"
+            "Choose a plan 👇"
+        )
+    elif lang == "vi":
+        plans_text = (
+            "💎 <b>Đăng ký Retouch Lab</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📅 1 tháng — <b>280,000 VND</b> (~$11)\n"
+            "📅 3 tháng — <b>710,000 VND</b> (~$28) · -15%\n"
+            "📅 6 tháng — <b>1,450,000 VND</b> (~$57) · -25%\n"
+            "📅 1 năm — <b>2,600,000 VND</b> (~$102) · -35% 🔥\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "🏦 Thanh toán qua Vietcombank\n\n"
+            "Chọn gói 👇"
+        )
+    elif lang == "ky":
+        plans_text = (
+            "💎 <b>Retouch Lab жазылуусу</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📅 1 ай — <b>990 сом</b> (~$11)\n"
+            "📅 3 ай — <b>2 490 сом</b> (~$28) · -15%\n"
+            "📅 6 ай — <b>4 990 сом</b> (~$57) · -25%\n"
+            "📅 1 жыл — <b>8 990 сом</b> (~$102) · -35% 🔥\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "Тариф тандаңыз 👇"
+        )
+    else:
+        plans_text = (
+            "💎 <b>Подписка Retouch Lab</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📅 1 месяц — <b>990 сом</b> (~$11)\n"
+            "📅 3 месяца — <b>2 490 сом</b> (~$28) · -15%\n"
+            "📅 6 месяцев — <b>4 990 сом</b> (~$57) · -25%\n"
+            "📅 1 год — <b>8 990 сом</b> (~$102) · -35% 🔥\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "Выберите тариф 👇"
+        )
     await message.answer(
-        "💎 <b>Подписка Retouch Lab</b>\n\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        f"📅 1 месяц — <b>990 сом</b> (~$11)\n"
-        f"📅 3 месяца — <b>2 490 сом</b> (~$28) · -15%\n"
-        f"📅 6 месяцев — <b>4 990 сом</b> (~$57) · -25%\n"
-        f"📅 1 год — <b>8 990 сом</b> (~$102) · -35% 🔥\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "Выберите тариф 👇",
+        plans_text,
         reply_markup=plans_keyboard(),
         parse_mode="HTML",
     )
@@ -825,9 +987,11 @@ async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
         "⏳ Подписка активируется в течение нескольких минут."
     )
 
-    if QR_PATH.exists():
+    lang = await get_user_language(callback.from_user.id)
+    qr = get_qr_path(lang)
+    if qr.exists():
         await callback.message.answer_photo(
-            photo=FSInputFile(QR_PATH),
+            photo=FSInputFile(qr),
             caption=caption,
             parse_mode="HTML",
         )
@@ -848,29 +1012,20 @@ async def callback_buy(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
     # Доллары для каждого тарифа
-    usd_map = {"1m": "$11", "3m": "$28", "6m": "$57", "1y": "$102"}
-    usd = usd_map.get(plan_type, "")
-
-    caption = (
-        f"💳 <b>Оплата: {plan_name} — {amount:,} сом ({usd})</b>\n\n"
-        f"Переведите <b>{amount:,} сом</b> на MBank:\n\n"
-        f"👤 <b>{MBANK_NAME}</b>\n"
-        f"📱 <b>{MBANK_PHONE}</b>\n\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "📌 <b>Как оплатить:</b>\n"
-        "1. Откройте MBank\n"
-        "2. Переводы → По номеру телефона\n"
-        "   или отсканируйте QR-код\n"
-        f"3. Введите сумму: <b>{amount:,} сом ({usd})</b>\n"
-        "4. Переведите и сохраните чек\n"
-        "5. Отправьте скриншот сюда 👇\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "⏳ Подписка активируется в течение нескольких минут."
+    lang = await get_user_language(callback.from_user.id)
+    caption = get_payment_caption(
+        lang=lang,
+        plan_name=plan_name,
+        amount_som=amount,
+        amount_usd=PLAN_PRICES_USD.get(plan_type, 11),
+        amount_vnd=PLAN_PRICES_VND.get(plan_type, 280000),
     )
 
-    if QR_PATH.exists():
+    lang = await get_user_language(callback.from_user.id)
+    qr = get_qr_path(lang)
+    if qr.exists():
         await callback.message.answer_photo(
-            photo=FSInputFile(QR_PATH),
+            photo=FSInputFile(qr),
             caption=caption,
             parse_mode="HTML",
         )
@@ -1462,19 +1617,55 @@ async def cmd_promo(message: Message, state: FSMContext):
         )
     ]])
 
-    PROMO_TEXT = (
-        "🔥 ——————————————— 🔥\n"
-        "<b>С Ч А С Т Л И В Ы Е</b>\n"
-        "<b>      Ч А С Ы</b>\n"
-        "🔥 ——————————————— 🔥\n\n"
-        "<i>Только сегодня — подписка на 1 месяц</i>\n\n"
-        "💎 <b>799 сом</b>  <s>990 сом</s>  (~<b>$9</b> вместо $11)\n\n"
-        "✦ Неограниченная AI-ретушь\n"
-        "✦ Natural Dodge & Burn — без пластика\n"
-        "✦ Оригинальное разрешение 4K / 24MP\n"
-        "✦ 5 режимов обработки\n\n"
-        "⏰ <b>Акция действует 24 часа</b>"
-    )
+    PROMO_TEXTS = {
+        "ru": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>С Ч А С Т Л И В Ы Е</b>\n"
+            "<b>      Ч А С Ы</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Только сегодня — подписка на 1 месяц</i>\n\n"
+            "💎 <b>799 сом</b>  <s>990 сом</s>  (~<b>$9</b> вместо $11)\n\n"
+            "✦ Неограниченная AI-ретушь\n"
+            "✦ Оригинальное разрешение 4K / 24MP\n"
+            "✦ 5 режимов обработки\n\n"
+            "⏰ <b>Акция действует 24 часа</b>"
+        ),
+        "ky": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>Б А К Ы Т Т У У</b>\n"
+            "<b>С А А Т Т А Р</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Бүгүн гана — 1 айлык жазылуу</i>\n\n"
+            "💎 <b>799 сом</b>  <s>990 сом</s>  (~<b>$9</b>)\n\n"
+            "✦ Чексиз AI ретуши\n"
+            "✦ Оригинал сапат 4K / 24MP\n"
+            "✦ 5 иштетүү режими\n\n"
+            "⏰ <b>Акция 24 саат</b>"
+        ),
+        "en": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>H A P P Y   H O U R S</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Today only — 1 month subscription</i>\n\n"
+            "💎 <b>$9 USDT</b>  <s>$11</s>\n\n"
+            "✦ Unlimited AI retouching\n"
+            "✦ Original quality 4K / 24MP\n"
+            "✦ 5 processing modes\n\n"
+            "⏰ <b>Offer valid 24 hours</b>"
+        ),
+        "vi": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>G I Ờ   V À N G</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Chỉ hôm nay — đăng ký 1 tháng</i>\n\n"
+            "💎 <b>250,000 VND</b>  <s>280,000 VND</s>  (~$9)\n\n"
+            "✦ Retouch AI không giới hạn\n"
+            "✦ Chất lượng gốc 4K / 24MP\n"
+            "✦ 5 chế độ xử lý\n\n"
+            "⏰ <b>Ưu đãi có hiệu lực 24 giờ</b>"
+        ),
+    }
+    PROMO_TEXT = PROMO_TEXTS.get("ru")  # дефолт для preview
 
     # Устанавливаем флаг акции на 24 часа
     import time as _time
@@ -1557,9 +1748,11 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
 
     for i, uid in enumerate(target_ids):
         try:
+            user_lang = await get_user_language(uid)
+            user_promo = PROMO_TEXTS.get(user_lang, PROMO_TEXTS["ru"])
             await bot.send_message(
                 chat_id=uid,
-                text=promo_text,
+                text=user_promo,
                 reply_markup=promo_buy_kb,
                 parse_mode="HTML",
             )
@@ -1593,6 +1786,86 @@ async def promo_cancelled(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
     await callback.message.edit_text("❌ Рассылка отменена")
+
+
+@dp.message(Command("language"))
+async def cmd_language(message: Message, state: FSMContext):
+    """Выбор языка — доступно всем пользователям."""
+    lang = await get_user_language(message.from_user.id)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🇷🇺 Русский",      callback_data="lang_ru")],
+        [InlineKeyboardButton(text="🇬🇧 English",      callback_data="lang_en")],
+        [InlineKeyboardButton(text="🇻🇳 Tiếng Việt",   callback_data="lang_vi")],
+        [InlineKeyboardButton(text="🇰🇬 Кыргызча",     callback_data="lang_ky")],
+    ])
+    await message.answer(
+        "🌐 <b>Выберите язык / Choose language / Chọn ngôn ngữ / Тилди тандаңыз:</b>",
+        reply_markup=kb,
+        parse_mode="HTML",
+    )
+
+
+@dp.callback_query(F.data.startswith("lang_"))
+async def callback_set_language(callback: CallbackQuery):
+    """Устанавливает язык пользователя."""
+    lang = callback.data.replace("lang_", "")
+    if lang not in LANGUAGES:
+        await callback.answer("Unknown language")
+        return
+
+    uid = callback.from_user.id
+    await set_user_language(uid, lang)
+    await callback.answer()
+
+    lang_name = LANGUAGES[lang]
+    await callback.message.edit_text(
+        f"✅ {lang_name}",
+        parse_mode="HTML",
+    )
+
+    # Показываем приветствие на выбранном языке
+    has_sub = bool(await check_active_subscription(uid))
+    trial_used = await get_trial_count(uid)
+    remaining = max(0, TRIAL_LIMIT - trial_used)
+    import time as _time
+    promo_active = _promo_until > _time.time()
+
+    if has_sub:
+        trial_btn = t("btn_process", lang)
+    elif remaining > 0:
+        trial_btn = t("btn_try_free", lang, n=remaining)
+    elif promo_active:
+        trial_btn = "🔥 Акция — 799 сом (~$9)"
+    else:
+        trial_btn = t("btn_buy_sub", lang)
+
+    dynamic_menu = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=trial_btn)],
+            [KeyboardButton(text=t("btn_examples", lang)),
+             KeyboardButton(text=t("btn_subscription", lang))],
+            [KeyboardButton(text=t("btn_about", lang)),
+             KeyboardButton(text=t("btn_support", lang))],
+        ],
+        resize_keyboard=True,
+    )
+
+    banner_path = Path(__file__).parent / "start_banner.png"
+    if banner_path.exists():
+        try:
+            await callback.message.answer_photo(
+                photo=FSInputFile(str(banner_path)),
+                caption="✨ <b>RETOUCH LAB</b>",
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
+    await callback.message.answer(
+        t("welcome", lang),
+        reply_markup=dynamic_menu,
+        parse_mode="HTML",
+    )
 
 
 @dp.message(Command("relaunch"))
