@@ -401,7 +401,7 @@ main_menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="✨ Обработать фото")],
         [KeyboardButton(text="🎁 Попробовать бесплатно"), KeyboardButton(text="💎 Подписка")],
         [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="ℹ️ О боте")],
-        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text="🌐 Язык / Language")],
+        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text=TEXTS.get("btn_language", {}).get(lang, "🌐 Language"))],
     ],
     resize_keyboard=True,
 )
@@ -471,7 +471,7 @@ def make_main_menu(lang: str = "ru", remaining: int = 0,
         [KeyboardButton(text=TEXTS["btn_examples"].get(lang, TEXTS["btn_examples"]["ru"])),
          KeyboardButton(text=TEXTS["btn_subscription"].get(lang, TEXTS["btn_subscription"]["ru"]))],
         [KeyboardButton(text=TEXTS["btn_support"].get(lang, TEXTS["btn_support"]["ru"])),
-         KeyboardButton(text="🌐 Язык / Language")],
+         KeyboardButton(text=TEXTS.get("btn_language", {}).get(lang, "🌐 Language"))],
         [KeyboardButton(text=TEXTS["btn_about"].get(lang, TEXTS["btn_about"]["ru"]))],
     ]
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
@@ -550,12 +550,26 @@ async def cmd_start(message: Message, state: FSMContext):
         username=message.from_user.username,
         first_name=message.from_user.first_name,
     )
-    # Проверяем установлен ли язык
+    # Определяем язык — если уже выбран вручную, не меняем
     lang = await get_user_language(message.from_user.id)
     if not lang or lang == "ru":
-        # Показываем выбор языка при первом запуске
-        # (существующим пользователям — сразу русский)
-        pass  # язык уже ru по умолчанию
+        # Для новых пользователей — определяем по Telegram language_code
+        tg_lang = (message.from_user.language_code or "").lower()
+        if tg_lang.startswith("ky"):
+            auto_lang = "ky"
+        elif tg_lang.startswith("ru"):
+            auto_lang = "ru"
+        elif tg_lang.startswith("vi"):
+            auto_lang = "vi"
+        elif tg_lang.startswith("en"):
+            auto_lang = "en"
+        else:
+            auto_lang = "en"  # fallback для всех остальных
+        # Сохраняем только если ещё не установлен вручную
+        if not lang:
+            await set_user_language(message.from_user.id, auto_lang)
+            lang = auto_lang
+        # Если lang == "ru" и это старый пользователь — оставляем ru
     # Динамическое приветствие
     uid = message.from_user.id
     has_sub = bool(await check_active_subscription(uid))
@@ -594,7 +608,7 @@ async def cmd_start(message: Message, state: FSMContext):
     menu_rows += [
         [KeyboardButton(text="✨ Обработать фото")],
         [KeyboardButton(text="🎥 Примеры до / после"), KeyboardButton(text="💎 Подписка")],
-        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text="🌐 Язык / Language")],
+        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text=TEXTS.get("btn_language", {}).get(lang, "🌐 Language"))],
         [KeyboardButton(text="ℹ️ О боте")],
     ]
 
@@ -670,7 +684,7 @@ async def menu_promo_start(message: Message, state: FSMContext):
     )
 
 
-@dp.message(F.text == "🌐 Язык / Language")
+@dp.message(F.text.in_({"🌐 Язык / Language", "🌐 Язык", "🌐 Language", "🌐 Ngôn ngữ", "🌐 Тилди өзгөртүү"}))
 async def menu_language(message: Message, state: FSMContext):
     """Кнопка смены языка в главном меню."""
     lang = await get_user_language(message.from_user.id)
@@ -1079,18 +1093,18 @@ async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
 
     lang = await get_user_language(callback.from_user.id)
     qr = get_qr_path(lang)
+    from texts import TEXTS as _TCK
+    _card_txt = _TCK.get("card_coming_soon", {}).get(lang, "")
     if qr.exists():
         await callback.message.answer_photo(
             photo=FSInputFile(qr),
-            caption=caption,
+            caption=caption + _card_txt,
             parse_mode="HTML",
         )
     else:
-        await callback.message.answer(caption, parse_mode="HTML")
+        await callback.message.answer(caption + _card_txt, parse_mode="HTML")
 
-    _cklang = await get_user_language(callback.from_user.id)
-    from texts import TEXTS as _TCK
-    await callback.message.answer(_TCK["send_check"].get(_cklang, _TCK["send_check"]["ru"]))
+    await callback.message.answer(_TCK["send_check"].get(lang, _TCK["send_check"]["ru"]))
 
 
 @dp.callback_query(F.data.startswith("buy_"))
@@ -1115,18 +1129,18 @@ async def callback_buy(callback: CallbackQuery, state: FSMContext):
 
     lang = await get_user_language(callback.from_user.id)
     qr = get_qr_path(lang)
+    from texts import TEXTS as _TCK
+    _card_txt = _TCK.get("card_coming_soon", {}).get(lang, "")
     if qr.exists():
         await callback.message.answer_photo(
             photo=FSInputFile(qr),
-            caption=caption,
+            caption=caption + _card_txt,
             parse_mode="HTML",
         )
     else:
-        await callback.message.answer(caption, parse_mode="HTML")
+        await callback.message.answer(caption + _card_txt, parse_mode="HTML")
 
-    _cklang = await get_user_language(callback.from_user.id)
-    from texts import TEXTS as _TCK
-    await callback.message.answer(_TCK["send_check"].get(_cklang, _TCK["send_check"]["ru"]))
+    await callback.message.answer(_TCK["send_check"].get(lang, _TCK["send_check"]["ru"]))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
