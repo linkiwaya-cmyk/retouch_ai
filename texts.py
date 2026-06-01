@@ -1160,3 +1160,18 @@ TEXTS.update({
         ),
     },
 })
+
+TEXTS.update({
+    "card_coming_soon": {
+        "ru": "\nℹ️ <i>Скоро будет доступна оплата банковскими картами Visa и Mastercard.</i>",
+        "en": "\nℹ️ <i>Card payments via Visa and Mastercard will be available soon.</i>",
+        "vi": "\nℹ️ <i>Thanh toán bằng thẻ Visa và Mastercard sẽ sớm được hỗ trợ.</i>",
+        "ky": "\nℹ️ <i>Жакында Visa жана Mastercard аркылуу төлөө жеткиликтүү болот.</i>",
+    },
+    "btn_language": {
+        "ru": "🌐 Язык",
+        "en": "🌐 Language",
+        "vi": "🌐 Ngôn ngữ",
+        "ky": "🌐 Тилди өзгөртүү",
+    },
+})
