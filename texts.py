@@ -249,10 +249,10 @@ TEXTS = {
         "ky": "🎁 Акысыз калды: <b>{n}</b>",
     },
     "trial_last": {
-        "ru": "⚠️ <b>Осталась 1 бесплатная обработка</b>\n\nОформи подписку заранее 👇",
-        "en": "⚠️ <b>1 free retouch left</b>\n\nGet a subscription in advance 👇",
-        "vi": "⚠️ <b>Còn 1 lần retouch miễn phí</b>\n\nMua đăng ký trước 👇",
-        "ky": "⚠️ <b>1 акысыз иштетүү калды</b>\n\nАлдын ала жазылыңыз 👇",
+        "ru": "⚠️ <b>Осталась 1 бесплатная обработка</b>\n\nОформи подписку заранее",
+        "en": "⚠️ <b>1 free retouch left</b>\n\nGet a subscription in advance",
+        "vi": "⚠️ <b>Còn 1 lần retouch miễn phí</b>\n\nMua đăng ký trước",
+        "ky": "⚠️ <b>1 акысыз иштетүү калды</b>\n\nАлдын ала жазылыңыз",
     },
     "trial_exceeded": {
         "ru": (
@@ -260,25 +260,25 @@ TEXTS = {
             "💡 Ретушёр берёт 300–1500 сом за одно фото.\n"
             "Retouch Lab — 990 сом в месяц без ограничений.\n\n"
             "⏰ <b>Акция:</b> первый месяц за <b>799 сом</b>\n\n"
-            "Выбери тариф 👇"
+            "Выбери тариф"
         ),
         "en": (
             "💎 <b>Free retouches used up</b>\n\n"
             "💡 A retoucher charges $5–20 per photo.\n"
             "Retouch Lab — unlimited for just $11/month.\n\n"
-            "Choose a plan 👇"
+            "Choose a plan"
         ),
         "vi": (
             "💎 <b>Đã dùng hết lần retouch miễn phí</b>\n\n"
             "💡 Chuyên gia retouch tính 200–500K/ảnh.\n"
             "Retouch Lab — không giới hạn chỉ $11/tháng.\n\n"
-            "Chọn gói 👇"
+            "Chọn gói"
         ),
         "ky": (
             "💎 <b>Акысыз иштетүүлөр бүттү</b>\n\n"
             "💡 Ретушер бир сүрөткө 300–1500 сом алат.\n"
             "Retouch Lab — айына 990 сомго чексиз.\n\n"
-            "Тариф тандаңыз 👇"
+            "Тариф тандаңыз"
         ),
     },
     "timeout_error": {
@@ -574,7 +574,7 @@ TEXTS.update({
             "📅 6 месяцев — <b>4 990 сом</b> (~$57) · -25%\n"
             "📅 1 год — <b>8 990 сом</b> (~$102) · -35% 🔥\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            "Выберите тариф 👇"
+            "Выберите тариф"
         ),
         "en": (
             "💎 <b>Retouch Lab Subscription</b>\n\n"
@@ -585,7 +585,7 @@ TEXTS.update({
             "📅 1 year — <b>$102</b> · -35% 🔥\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "💎 Payment via USDT (TRC20)\n\n"
-            "Choose a plan 👇"
+            "Choose a plan"
         ),
         "vi": (
             "💎 <b>Đăng ký Retouch Lab</b>\n\n"
@@ -596,7 +596,7 @@ TEXTS.update({
             "📅 1 năm — <b>2,600,000 VND</b> (~$102) · -35% 🔥\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "🏦 Thanh toán qua Vietcombank\n\n"
-            "Chọn gói 👇"
+            "Chọn gói"
         ),
         "ky": (
             "💎 <b>Retouch Lab жазылуусу</b>\n\n"
@@ -606,7 +606,7 @@ TEXTS.update({
             "📅 6 ай — <b>4 990 сом</b> (~$57) · -25%\n"
             "📅 1 жыл — <b>8 990 сом</b> (~$102) · -35% 🔥\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            "Тариф тандаңыз 👇"
+            "Тариф тандаңыз"
         ),
     },
 
@@ -618,17 +618,17 @@ TEXTS.update({
     },
 
     "main_menu_title": {
-        "ru": "Главное меню 👇",
-        "en": "Main menu 👇",
-        "vi": "Menu chính 👇",
-        "ky": "Башкы меню 👇",
+        "ru": "Главное меню",
+        "en": "Main menu",
+        "vi": "Menu chính",
+        "ky": "Башкы меню",
     },
 
     "choose_mode": {
-        "ru": "Выберите режим обработки 👇",
-        "en": "Choose processing mode 👇",
-        "vi": "Chọn chế độ xử lý 👇",
-        "ky": "Иштетүү режимин тандаңыз 👇",
+        "ru": "Выберите режим обработки",
+        "en": "Choose processing mode",
+        "vi": "Chọn chế độ xử lý",
+        "ky": "Иштетүү режимин тандаңыз",
     },
 
     "mode_selected": {
@@ -796,10 +796,10 @@ TEXTS.update({
     },
 
     "trial_last_one": {
-        "ru": "⚠️ <b>Осталась 1 бесплатная обработка</b>\n\nОформи подписку заранее 👇",
-        "en": "⚠️ <b>1 free retouch left</b>\n\nGet a subscription in advance 👇",
-        "vi": "⚠️ <b>Còn 1 lần retouch miễn phí</b>\n\nMua đăng ký trước 👇",
-        "ky": "⚠️ <b>1 акысыз иштетүү калды</b>\n\nАлдын ала жазылыңыз 👇",
+        "ru": "⚠️ <b>Осталась 1 бесплатная обработка</b>\n\nОформи подписку заранее",
+        "en": "⚠️ <b>1 free retouch left</b>\n\nGet a subscription in advance",
+        "vi": "⚠️ <b>Còn 1 lần retouch miễn phí</b>\n\nMua đăng ký trước",
+        "ky": "⚠️ <b>1 акысыз иштетүү калды</b>\n\nАлдын ала жазылыңыз",
     },
 
     "trial_done_sub": {
@@ -1030,16 +1030,16 @@ TEXTS.update({
         ),
     },
     "try_free_has_sub": {
-        "ru": "💎 У вас активная подписка — обрабатывайте без ограничений!\n\nВыберите режим обработки 👇",
-        "en": "💎 You have an active subscription — retouch without limits!\n\nChoose a processing mode 👇",
-        "vi": "💎 Bạn có đăng ký đang hoạt động — retouch không giới hạn!\n\nChọn chế độ xử lý 👇",
-        "ky": "💎 Активдүү жазылууңуз бар — чексиз иштетиңиз!\n\nИштетүү режимин тандаңыз 👇",
+        "ru": "💎 У вас активная подписка — обрабатывайте без ограничений!\n\nВыберите режим обработки",
+        "en": "💎 You have an active subscription — retouch without limits!\n\nChoose a processing mode",
+        "vi": "💎 Bạn có đăng ký đang hoạt động — retouch không giới hạn!\n\nChọn chế độ xử lý",
+        "ky": "💎 Активдүү жазылууңуз бар — чексиз иштетиңиз!\n\nИштетүү режимин тандаңыз",
     },
     "try_free_remaining": {
-        "ru": "🎁 <b>Вам доступно {n} из {total} бесплатных обработок</b>\n\nВыберите режим обработки 👇",
-        "en": "🎁 <b>You have {n} of {total} free retouches available</b>\n\nChoose a processing mode 👇",
-        "vi": "🎁 <b>Bạn có {n}/{total} lần retouch miễn phí</b>\n\nChọn chế độ xử lý 👇",
-        "ky": "🎁 <b>{n}/{total} акысыз иштетүү жеткиликтүү</b>\n\nИштетүү режимин тандаңыз 👇",
+        "ru": "🎁 <b>Вам доступно {n} из {total} бесплатных обработок</b>\n\nВыберите режим обработки",
+        "en": "🎁 <b>You have {n} of {total} free retouches available</b>\n\nChoose a processing mode",
+        "vi": "🎁 <b>Bạn có {n}/{total} lần retouch miễn phí</b>\n\nChọn chế độ xử lý",
+        "ky": "🎁 <b>{n}/{total} акысыз иштетүү жеткиликтүү</b>\n\nИштетүү режимин тандаңыз",
     },
     "formats_text": {
         "ru": (
@@ -1102,35 +1102,35 @@ TEXTS.update({
         "ky": "Тарифти 💎 Жазылуу менюсу аркылуу тандаңыз",
     },
     "send_check": {
-        "ru": "📸 Отправьте скриншот чека 👇",
-        "en": "📸 Send a screenshot of payment 👇",
-        "vi": "📸 Gửi ảnh chụp màn hình thanh toán 👇",
-        "ky": "📸 Чектин скриншотун жибериңиз 👇",
+        "ru": "📸 Отправьте скриншот чека",
+        "en": "📸 Send a screenshot of payment",
+        "vi": "📸 Gửi ảnh chụp màn hình thanh toán",
+        "ky": "📸 Чектин скриншотун жибериңиз",
     },
     "paywall_full": {
         "ru": (
             "💎 <b>Бесплатные обработки использованы</b>\n\n"
             "💡 Ретушёр берёт 300–1500 сом за одно фото.\n"
             "Retouch Lab — 990 сом в месяц без ограничений.\n\n"
-            "Выберите тариф 👇"
+            "Выберите тариф"
         ),
         "en": (
             "💎 <b>Free retouches used up</b>\n\n"
             "💡 A retoucher charges $5–20 per photo.\n"
             "Retouch Lab — unlimited for just $11/month.\n\n"
-            "Choose a plan 👇"
+            "Choose a plan"
         ),
         "vi": (
             "💎 <b>Đã dùng hết lần retouch miễn phí</b>\n\n"
             "💡 Chuyên gia retouch tính 200–500K/ảnh.\n"
             "Retouch Lab — không giới hạn chỉ 280K VND/tháng.\n\n"
-            "Chọn gói 👇"
+            "Chọn gói"
         ),
         "ky": (
             "💎 <b>Акысыз иштетүүлөр бүттү</b>\n\n"
             "💡 Ретушер бир сүрөткө 300–1500 сом алат.\n"
             "Retouch Lab — айына 990 сомго чексиз.\n\n"
-            "Тариф тандаңыз 👇"
+            "Тариф тандаңыз"
         ),
     },
     "wow_last_paywall": {
