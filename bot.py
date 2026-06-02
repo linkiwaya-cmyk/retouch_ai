@@ -198,7 +198,6 @@ MODES = {
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
                 {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.0},
-                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.25},
             ]
         }
     },
@@ -216,7 +215,6 @@ MODES = {
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.55},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.18, "Alpha2": 0.18},
                 {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.1,  "Alpha2": 0.0},
-                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.65},
             ]
         }
     },
@@ -235,7 +233,6 @@ MODES = {
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.65},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.28, "Alpha2": 0.28},
                 {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.0,  "Alpha2": 0.0},
-                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.42},
             ]
         }
     },
@@ -254,7 +251,6 @@ MODES = {
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.38, "Alpha2": 0.38},
                 {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.25, "Alpha2": 0.0},
-                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.65},
             ]
         }
     },
