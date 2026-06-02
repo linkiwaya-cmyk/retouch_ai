@@ -37,7 +37,6 @@ PRESET = {
         {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
         {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
         {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.0},
-        {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.25},
     ]
 }
 
