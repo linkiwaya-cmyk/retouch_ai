@@ -165,6 +165,7 @@ TEXTS = {
         "en": "💫 Depth & Light",
         "vi": "💫 Chiều Sâu & Ánh Sáng",
         "ky": "💫 Көлөм жана жарык",
+        "kk": "💫 Көлем және жарық",
     },
     "btn_mode_beauty": {
         "ru": "💄 Beauty Pro",
