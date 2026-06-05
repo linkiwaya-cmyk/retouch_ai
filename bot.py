@@ -269,7 +269,8 @@ _promo_until: float = 0.0  # unix timestamp конца акции
 GROUP_CHAT_ID  = int(os.getenv("GROUP_CHAT_ID", os.getenv("ADMIN_CHAT_ID", "532189427")))
 QR_PATH         = Path(__file__).parent / "qr_code.png"       # Бакай Банк RU/KY
 QR_PATH_VI      = Path(__file__).parent / "qr_code_vi.png"    # Vietcombank VI
-QR_PATH_USDT    = Path(__file__).parent / "qr_code_usdt.png"  # USDT EN
+QR_PATH_USDT    = Path(__file__).parent / "qr_code_usdt.png"  # USDT
+USDT_QR_PATH    = QR_PATH_USDT  # алиас для callback_show_usdt_qr
 USDT_ADDRESS    = "TVjWpiVhRBDQKKFBn8KzP4Mc7noRYoLFFZ"
 MBANK_PHONE     = "+996 (500) 070 759"
 MBANK_NAME      = "АЛИНА А."
@@ -289,7 +290,23 @@ def get_qr_path(lang: str) -> Path:
 def get_payment_caption(lang: str, plan_name: str, amount_som: int,
                          amount_usd: int, amount_vnd: int) -> str:
     """Текст инструкции по оплате на нужном языке."""
-    if lang == "vi":
+    if lang == "kk":
+        return (
+            f"💳 <b>Төлем: {plan_name} — {amount_som:,} сом (~${amount_usd})</b>\n\n"
+            f"<b>{amount_som:,} сом</b> Бакай Банкке аударыңыз:\n\n"
+            f"👤 <b>{MBANK_NAME}</b>\n"
+            f"📱 <b>{MBANK_PHONE}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📌 <b>Төлем жасау:</b>\n"
+            "1. Бакай Банк қолданбасын ашыңыз\n"
+            "2. Аударымдар → Телефон нөмірі бойынша\n"
+            f"3. Сумма: <b>{amount_som:,} сом (~${amount_usd})</b>\n"
+            "4. Аударыңыз және чекті сақтаңыз\n"
+            "5. Скриншотты осы жерге жіберіңіз\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⏳ Жазылым бірнеше минут ішінде белсендіріледі."
+        )
+    elif lang == "vi":
         return (
             f"💳 <b>Thanh toán: {plan_name} — {amount_vnd:,} VND (~${amount_usd})</b>\n\n"
             f"Chuyển <b>{amount_vnd:,} VND</b> qua Vietcombank:\n\n"
