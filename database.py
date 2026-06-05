@@ -24,6 +24,7 @@ PLAN_NAMES_LANG = {
     "en": {"1m": "1 month",  "3m": "3 months",  "6m": "6 months",  "1y": "1 year"},
     "vi": {"1m": "1 tháng",  "3m": "3 tháng",   "6m": "6 tháng",   "1y": "1 năm"},
     "ky": {"1m": "1 ай",     "3m": "3 ай",      "6m": "6 ай",      "1y": "1 жыл"},
+    "kk": {"1m": "1 ай",     "3m": "3 ай",      "6m": "6 ай",      "1y": "1 жыл"},
 }
 
 def get_plan_name(plan_type: str, lang: str = "ru") -> str:
