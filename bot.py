@@ -424,15 +424,18 @@ back_to_modes = ReplyKeyboardMarkup(
 def make_modes_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
     """Клавиатура режимов на нужном языке."""
     from texts import TEXTS
+    _l = lang if lang in ("ru", "en", "vi", "ky", "kk") else "ru"
+    def _t(key):
+        return TEXTS.get(key, {}).get(_l) or TEXTS.get(key, {}).get("ru", "")
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=TEXTS["btn_mode_clean"][lang])],
-            [KeyboardButton(text=TEXTS["btn_mode_natural"][lang])],
-            [KeyboardButton(text=TEXTS["btn_mode_depth"][lang])],
-            [KeyboardButton(text=TEXTS["btn_mode_beauty"][lang])],
-            [KeyboardButton(text=TEXTS["btn_mode_magazine"][lang])],
-            [KeyboardButton(text=TEXTS["btn_about_modes"][lang]),
-             KeyboardButton(text=TEXTS["btn_back_main"][lang])],
+            [KeyboardButton(text=_t("btn_mode_clean"))],
+            [KeyboardButton(text=_t("btn_mode_natural"))],
+            [KeyboardButton(text=_t("btn_mode_depth"))],
+            [KeyboardButton(text=_t("btn_mode_beauty"))],
+            [KeyboardButton(text=_t("btn_mode_magazine"))],
+            [KeyboardButton(text=_t("btn_about_modes")),
+             KeyboardButton(text=_t("btn_back_main"))],
         ],
         resize_keyboard=True,
     )
@@ -482,6 +485,7 @@ BACK_TEXTS = {
     "en": "⬅️ Back",
     "vi": "⬅️ Quay lại",
     "ky": "⬅️ Артка",
+    "kk": "⬅️ Артқа",
 }
 
 def make_back_menu(lang: str = "ru") -> ReplyKeyboardMarkup:
@@ -508,7 +512,7 @@ def plans_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
             ("📅 6 tháng — 1,450,000 VND (~$57) · -25%", "buy_6m"),
             ("📅 1 năm — 2,600,000 VND (~$102) · -35% 🔥","buy_1y"),
         ]
-    elif lang == "ky":
+    elif lang in ("ky", "kk"):
         labels = [
             ("📅 1 ай — 990 сом (~$11)",              "buy_1m"),
             ("📅 3 ай — 2,490 сом (~$28) · -15%",     "buy_3m"),
@@ -555,6 +559,8 @@ async def cmd_start(message: Message, state: FSMContext):
             auto_lang = "ky"
         elif tg_lang.startswith("ru"):
             auto_lang = "ru"
+        elif tg_lang.startswith("kk"):
+            auto_lang = "kk"
         elif tg_lang.startswith("vi"):
             auto_lang = "vi"
         elif tg_lang.startswith("en"):
@@ -688,6 +694,7 @@ async def menu_language(message: Message, state: FSMContext):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🇰🇬 Кыргызча",   callback_data="lang_ky")],
         [InlineKeyboardButton(text="🇷🇺 Русский",    callback_data="lang_ru")],
+        [InlineKeyboardButton(text="🇰🇿 Қазақша",    callback_data="lang_kk")],
         [InlineKeyboardButton(text="🇬🇧 English",    callback_data="lang_en")],
         [InlineKeyboardButton(text="🇻🇳 Tiếng Việt", callback_data="lang_vi")],
     ])
@@ -870,6 +877,9 @@ async def menu_about_modes(message: Message):
     # KY
     "✨ Таза тери", "🌿 Табигый ретушь",
     "💫 Көлөм жана жарык", "🌟 Журнал стили",
+    # KK
+    "✨ Таза тері", "🌿 Табиғи ретушь",
+    "💫 Көлем мен жарық", "🌟 Журнал стилі",
 }))
 async def select_mode(message: Message):
     mode_map = {
@@ -889,6 +899,10 @@ async def select_mode(message: Message):
         "✨ Таза тери": "clean", "🌿 Табигый ретушь": "natural",
         "💫 Көлөм жана жарык": "depth", "💄 Beauty Pro": "beauty",
         "🌟 Журнал стили": "magazine",
+        # KK
+        "✨ Таза тері": "clean", "🌿 Табиғи ретушь": "natural",
+        "💫 Көлем мен жарық": "depth", "💄 Beauty Pro": "beauty",
+        "🌟 Журнал стилі": "magazine",
     }
     uid = message.from_user.id
     mode_key = mode_map.get(message.text, DEFAULT_MODE)
@@ -1028,7 +1042,7 @@ async def menu_sub(message: Message):
 
     from texts import TEXTS as _TSP
     lang = await get_user_language(message.from_user.id)
-    plans_text = _TSP["sub_plans"].get(lang, _TSP["sub_plans"]["ru"])
+    plans_text = _TSP["sub_plans"].get(lang, _TSP["sub_plans"].get("ru"))
     await message.answer(plans_text, reply_markup=plans_keyboard(lang), parse_mode="HTML")
 
 
@@ -1090,15 +1104,41 @@ async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
     lang = await get_user_language(callback.from_user.id)
     qr = get_qr_path(lang)
     from texts import TEXTS as _TCK
-    _card_txt = _TCK.get("card_coming_soon", {}).get(lang, "")
+
+    # 1. Банковский QR
     if qr.exists():
-        await callback.message.answer_photo(
-            photo=FSInputFile(qr),
-            caption=caption + _card_txt,
-            parse_mode="HTML",
-        )
+        try:
+            await callback.message.answer_photo(
+                photo=FSInputFile(qr),
+                caption=caption,
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error("QR send error: %s", e)
+            await callback.message.answer(caption, parse_mode="HTML")
     else:
-        await callback.message.answer(caption + _card_txt, parse_mode="HTML")
+        await callback.message.answer(caption, parse_mode="HTML")
+        qr_upd = _TCK["qr_updating"].get(lang, _TCK["qr_updating"]["ru"])
+        await callback.message.answer(qr_upd)
+
+    # 2. USDT блок
+    usdt_txt = _TCK["usdt_payment"].get(lang, _TCK["usdt_payment"]["en"])
+    usdt_btn_txt = _TCK["usdt_btn"].get(lang, "📱 USDT QR")
+    usdt_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=usdt_btn_txt, callback_data="show_usdt_qr")
+    ]])
+    await callback.message.answer(
+        usdt_txt.format(address=USDT_ADDRESS),
+        reply_markup=usdt_kb,
+        parse_mode="HTML",
+    )
+
+    # 3. Visa/MC текст
+    _card_txt = _TCK.get("card_coming_soon", {})
+    if isinstance(_card_txt, dict):
+        _card_txt = _card_txt.get(lang, _card_txt.get("ru", ""))
+    if _card_txt:
+        await callback.message.answer(_card_txt, parse_mode="HTML")
 
     await callback.message.answer(_TCK["send_check"].get(lang, _TCK["send_check"]["ru"]))
 
@@ -1126,15 +1166,41 @@ async def callback_buy(callback: CallbackQuery, state: FSMContext):
     lang = await get_user_language(callback.from_user.id)
     qr = get_qr_path(lang)
     from texts import TEXTS as _TCK
-    _card_txt = _TCK.get("card_coming_soon", {}).get(lang, "")
+
+    # 1. Банковский QR
     if qr.exists():
-        await callback.message.answer_photo(
-            photo=FSInputFile(qr),
-            caption=caption + _card_txt,
-            parse_mode="HTML",
-        )
+        try:
+            await callback.message.answer_photo(
+                photo=FSInputFile(qr),
+                caption=caption,
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error("QR send error: %s", e)
+            await callback.message.answer(caption, parse_mode="HTML")
     else:
-        await callback.message.answer(caption + _card_txt, parse_mode="HTML")
+        await callback.message.answer(caption, parse_mode="HTML")
+        qr_upd = _TCK["qr_updating"].get(lang, _TCK["qr_updating"]["ru"])
+        await callback.message.answer(qr_upd)
+
+    # 2. USDT блок
+    usdt_txt = _TCK["usdt_payment"].get(lang, _TCK["usdt_payment"]["en"])
+    usdt_btn_txt = _TCK["usdt_btn"].get(lang, "📱 USDT QR")
+    usdt_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=usdt_btn_txt, callback_data="show_usdt_qr")
+    ]])
+    await callback.message.answer(
+        usdt_txt.format(address=USDT_ADDRESS),
+        reply_markup=usdt_kb,
+        parse_mode="HTML",
+    )
+
+    # 3. Visa/MC текст
+    _card_txt = _TCK.get("card_coming_soon", {})
+    if isinstance(_card_txt, dict):
+        _card_txt = _card_txt.get(lang, _card_txt.get("ru", ""))
+    if _card_txt:
+        await callback.message.answer(_card_txt, parse_mode="HTML")
 
     await callback.message.answer(_TCK["send_check"].get(lang, _TCK["send_check"]["ru"]))
 
@@ -1887,6 +1953,29 @@ async def promo_cancelled(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
     await callback.message.edit_text("❌ Рассылка отменена")
+
+
+@dp.callback_query(F.data == "show_usdt_qr")
+async def callback_show_usdt_qr(callback: CallbackQuery):
+    """Показывает QR для USDT оплаты."""
+    uid = callback.from_user.id
+    lang = await get_user_language(uid)
+    await callback.answer()
+    if USDT_QR_PATH.exists():
+        try:
+            await callback.message.answer_photo(
+                photo=FSInputFile(USDT_QR_PATH),
+                caption=f"<code>{USDT_ADDRESS}</code>",
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error("USDT QR error: %s", e)
+            await callback.message.answer(f"<code>{USDT_ADDRESS}</code>", parse_mode="HTML")
+    else:
+        await callback.message.answer(
+            f"<b>USDT {USDT_NETWORK}</b>\n\n<code>{USDT_ADDRESS}</code>",
+            parse_mode="HTML",
+        )
 
 
 @dp.message(Command("language"))
