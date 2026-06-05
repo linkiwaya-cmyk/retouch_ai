@@ -267,7 +267,7 @@ _promo_until: float = 0.0  # unix timestamp конца акции
 # GROUP_CHAT_ID — отдельная группа куда приходят чеки с кнопками approve/reject
 # Получить: создай группу → добавь бота → напиши /start → смотри getUpdates
 GROUP_CHAT_ID  = int(os.getenv("GROUP_CHAT_ID", os.getenv("ADMIN_CHAT_ID", "532189427")))
-QR_PATH         = Path(__file__).parent / "qr_code.png"       # MBank RU/KY
+QR_PATH         = Path(__file__).parent / "qr_code.png"       # Бакай Банк RU/KY
 QR_PATH_VI      = Path(__file__).parent / "qr_code_vi.png"    # Vietcombank VI
 QR_PATH_USDT    = Path(__file__).parent / "qr_code_usdt.png"  # USDT EN
 USDT_ADDRESS    = "TVjWpiVhRBDQKKFBn8KzP4Mc7noRYoLFFZ"
@@ -323,10 +323,10 @@ def get_payment_caption(lang: str, plan_name: str, amount_som: int,
             "⏳ Subscription activates within a few minutes."
         )
     else:
-        # RU / KY — MBank
+        # RU / KY — Бакай Банк
         return (
             f"💳 <b>Оплата: {plan_name} — {amount_som:,} сом (~${amount_usd})</b>\n\n"
-            f"Переведите <b>{amount_som:,} сом</b> на MBank:\n\n"
+            f"Переведите <b>{amount_som:,} сом</b> в Бакай Банк:\n\n"
             f"👤 <b>{MBANK_NAME}</b>\n"
             f"📱 <b>{MBANK_PHONE}</b>\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
@@ -887,7 +887,8 @@ async def menu_about_modes(message: Message):
     "💫 Көлөм жана жарык", "🌟 Журнал стили",
     # KK
     "✨ Таза тері", "🌿 Табиғи ретушь",
-    "💫 Көлем мен жарық", "🌟 Журнал стилі",
+    "💫 Көлем мен жарық", "💫 Көлем және жарық",
+    "🌟 Журнал стилі",
 }))
 async def select_mode(message: Message):
     mode_map = {
@@ -909,7 +910,8 @@ async def select_mode(message: Message):
         "🌟 Журнал стили": "magazine",
         # KK
         "✨ Таза тері": "clean", "🌿 Табиғи ретушь": "natural",
-        "💫 Көлем мен жарық": "depth", "💄 Beauty Pro": "beauty",
+        "💫 Көлем мен жарық": "depth", "💫 Көлем және жарық": "depth",
+        "💄 Beauty Pro": "beauty",
         "🌟 Журнал стилі": "magazine",
     }
     uid = message.from_user.id
@@ -1095,7 +1097,7 @@ async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
 
     caption = (
         f"🔥 <b>Акция: {plan_name} — {PROMO_PRICE} сом (~$9)</b>\n\n"
-        f"Переведите <b>{PROMO_PRICE} сом</b> на MBank:\n\n"
+        f"Переведите <b>{PROMO_PRICE} сом</b> в Бакай Банк:\n\n"
         f"👤 <b>{MBANK_NAME}</b>\n"
         f"📱 <b>{MBANK_PHONE}</b>\n\n"
         "━━━━━━━━━━━━━━━━━━\n"
