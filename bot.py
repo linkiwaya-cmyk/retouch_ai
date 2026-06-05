@@ -442,9 +442,9 @@ def make_modes_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
 
 
 def make_back_to_modes(lang: str = "ru") -> ReplyKeyboardMarkup:
-    from texts import TEXTS
+    txt = BACK_TO_MODES_TEXTS.get(lang, BACK_TO_MODES_TEXTS["ru"])
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=TEXTS["btn_back_modes"][lang])]],
+        keyboard=[[KeyboardButton(text=txt)]],
         resize_keyboard=True,
     )
 
@@ -470,7 +470,7 @@ def make_main_menu(lang: str = "ru", remaining: int = 0,
         [KeyboardButton(text=TEXTS["btn_examples"].get(lang, TEXTS["btn_examples"]["ru"])),
          KeyboardButton(text=TEXTS["btn_subscription"].get(lang, TEXTS["btn_subscription"]["ru"]))],
         [KeyboardButton(text=TEXTS["btn_support"].get(lang, TEXTS["btn_support"]["ru"])),
-         KeyboardButton(text=TEXTS.get("btn_language", {}).get(lang, "🌐 Language"))],
+         KeyboardButton(text=TEXTS.get("btn_language", {}).get(lang) or TEXTS.get("btn_language", {}).get("en", "🌐 Language"))],
         [KeyboardButton(text=TEXTS["btn_about"].get(lang, TEXTS["btn_about"]["ru"]))],
     ]
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
@@ -486,6 +486,14 @@ BACK_TEXTS = {
     "vi": "⬅️ Quay lại",
     "ky": "⬅️ Артка",
     "kk": "⬅️ Артқа",
+}
+
+BACK_TO_MODES_TEXTS = {
+    "ru": "⬅️ Назад к режимам",
+    "en": "⬅️ Back to modes",
+    "vi": "⬅️ Quay lại chế độ",
+    "ky": "⬅️ Режимдерге кайт",
+    "kk": "⬅️ Режимдерге қайту",
 }
 
 def make_back_menu(lang: str = "ru") -> ReplyKeyboardMarkup:
@@ -653,7 +661,7 @@ async def cmd_start(message: Message, state: FSMContext):
 # Меню
 # ══════════════════════════════════════════════════════════════════════════════
 
-@dp.message(F.text == "🔥 Акция — 799 сом (~$9)")
+@dp.message(F.text.in_({"🔥 Акция — 799 сом (~$9)", "🔥 990 сомға сатып алу (~$9)"}))
 async def menu_promo_start(message: Message, state: FSMContext):
     """Кнопка акции в главном меню — показывает акционное предложение."""
     import time as _time
@@ -686,7 +694,7 @@ async def menu_promo_start(message: Message, state: FSMContext):
     )
 
 
-@dp.message(F.text.in_({"🌐 Язык / Language", "🌐 Язык", "🌐 Language", "🌐 Ngôn ngữ", "🌐 Тилди өзгөртүү"}))
+@dp.message(F.text.in_({"🌐 Язык / Language", "🌐 Язык", "🌐 Language", "🌐 Ngôn ngữ", "🌐 Тилди өзгөртүү", "🌐 Тіл"}))
 async def menu_language(message: Message, state: FSMContext):
     """Кнопка смены языка в главном меню."""
     lang = await get_user_language(message.from_user.id)
@@ -705,7 +713,7 @@ async def menu_language(message: Message, state: FSMContext):
     )
 
 
-@dp.message(F.text.in_({'⬅️ Назад', '⬅️ Back', '⬅️ Quay lại', '⬅️ Артка', '⬅️ Башкы меню', '⬅️ Menu chính', '⬅️ Главное меню', '⬅️ Main menu'}))
+@dp.message(F.text.in_({'⬅️ Назад', '⬅️ Back', '⬅️ Quay lại', '⬅️ Артка', '⬅️ Артқа', '⬅️ Башкы меню', '⬅️ Басты мәзір', '⬅️ Menu chính', '⬅️ Главное меню', '⬅️ Main menu'}))
 async def back(message: Message, state: FSMContext):
     await state.clear()
     uid = message.from_user.id
@@ -722,7 +730,7 @@ async def back(message: Message, state: FSMContext):
     )
 
 
-@dp.message(F.text.in_({'⬅️ Back to modes', '⬅️ Quay lại chế độ', '⬅️ Режимдерге кайт', '⬅️ Назад к режимам'}))
+@dp.message(F.text.in_({'⬅️ Back to modes', '⬅️ Quay lại chế độ', '⬅️ Режимдерге кайт', '⬅️ Режимдерге қайту', '⬅️ Назад к режимам'}))
 async def back_to_modes_handler(message: Message, state: FSMContext):
     """Возврат к списку режимов — НЕ в главное меню."""
     user_lang = await get_user_language(message.from_user.id)
@@ -733,7 +741,7 @@ async def back_to_modes_handler(message: Message, state: FSMContext):
     )
 
 
-@dp.message(F.text.in_({'ℹ️ About', 'ℹ️ Giới thiệu', 'ℹ️ Бот жөнүндө', 'ℹ️ О боте'}))
+@dp.message(F.text.in_({'ℹ️ About', 'ℹ️ Giới thiệu', 'ℹ️ Бот жөнүндө', 'ℹ️ Бот туралы', 'ℹ️ О боте'}))
 async def menu_about(message: Message):
     from texts import TEXTS
     lang = await get_user_language(message.from_user.id)
@@ -749,7 +757,7 @@ async def menu_support(message: Message):
     await message.answer(txt, reply_markup=back_menu, parse_mode="HTML")
 
 
-@dp.message(F.text.in_({'🎥 Before / After examples', '🎥 Примеры до / после', '🎥 Мисалдар чейин / кийин', '🖼 Before / After', '🎥 Ví dụ trước / sau'}))
+@dp.message(F.text.in_({'🎥 Before / After examples', '🎥 Примеры до / после', '🎥 Мисалдар чейин / кийин', '🎥 Мысалдар дейін / кейін', '🖼 Before / After', '🎥 Ví dụ trước / sau'}))
 async def menu_before_after(message: Message):
     from aiogram.types import InputMediaPhoto
 
@@ -922,7 +930,7 @@ async def select_mode(message: Message):
     )
 
 
-@dp.message(F.text == "🎁 Попробовать бесплатно")
+@dp.message(F.text.in_({"🎁 Попробовать бесплатно", "🎁 Тегін байқап көру"}))
 async def menu_try_free(message: Message):
     uid = message.from_user.id
     has_sub = bool(await check_active_subscription(uid))
@@ -956,7 +964,7 @@ async def menu_try_free(message: Message):
 
 
 # Динамическая кнопка "Попробовать бесплатно (осталось X из 3)"
-@dp.message(F.text.startswith("🎁 Обработать фото (осталось"))
+@dp.message(F.text.startswith("🎁"))
 async def menu_try_free_dynamic(message: Message):
     """Кнопка с остатком бесплатных — ведёт к режимам."""
     uid = message.from_user.id
