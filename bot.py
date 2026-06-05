@@ -331,7 +331,7 @@ def get_payment_caption(lang: str, plan_name: str, amount_som: int,
             f"📱 <b>{MBANK_PHONE}</b>\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "📌 <b>Как оплатить:</b>\n"
-            "1. Откройте MBank\n"
+            "1. Откройте Бакай Банк\n"
             "2. Переводы → По номеру телефона\n"
             f"3. Сумма: <b>{amount_som:,} сом (~${amount_usd})</b>\n"
             "4. Переведите и сохраните чек\n"
@@ -749,7 +749,7 @@ async def menu_about(message: Message):
     await message.answer(txt, reply_markup=make_back_menu(lang), parse_mode="HTML")
 
 
-@dp.message(F.text.in_({'💬 Колдоо', '💬 Hỗ trợ', '💬 Поддержка', '💬 Support'}))
+@dp.message(F.text.in_({'💬 Колдоо', '💬 Қолдау', '💬 Hỗ trợ', '💬 Поддержка', '💬 Support'}))
 async def menu_support(message: Message):
     from texts import TEXTS
     lang = await get_user_language(message.from_user.id)
@@ -860,7 +860,7 @@ async def menu_formats(message: Message):
     )
 
 
-@dp.message(F.text.in_({'📖 About modes', '📖 О режимах', '📖 Режимдер жөнүндө', '📖 Về các chế độ'}))
+@dp.message(F.text.in_({'📖 About modes', '📖 О режимах', '📖 Режимдер жөнүндө', '📖 Режимдер туралы', '📖 Về các chế độ'}))
 async def menu_about_modes(message: Message):
     user_lang = await get_user_language(message.from_user.id)
     from texts import TEXTS as _TAM
@@ -997,7 +997,7 @@ async def menu_try_free_dynamic(message: Message):
         )
 
 
-@dp.message(F.text.in_({'📸 Обработать фото', '✨ Сүрөттү иштет', '✨ Обработать фото', '✨ Xử lý ảnh', '✨ Process photo'}))
+@dp.message(F.text.in_({'📸 Обработать фото', '✨ Сүрөттү иштет', '✨ Суретті өңдеу', '✨ Обработать фото', '✨ Xử lý ảnh', '✨ Process photo'}))
 async def menu_process(message: Message):
     uid = message.from_user.id
     has_sub = bool(await check_active_subscription(uid))
@@ -1031,7 +1031,7 @@ async def menu_process(message: Message):
     )
 
 
-@dp.message(F.text.in_({'💎 Đăng ký', '💎 Subscription', '💎 Жазылуу', '💎 Подписка'}))
+@dp.message(F.text.in_({'💎 Đăng ký', '💎 Subscription', '💎 Жазылуу', '💎 Жазылым', '💎 Подписка'}))
 async def menu_sub(message: Message):
     sub = await check_active_subscription(message.from_user.id)
 
@@ -1102,7 +1102,7 @@ async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
         f"📱 <b>{MBANK_PHONE}</b>\n\n"
         "━━━━━━━━━━━━━━━━━━\n"
         "📌 <b>Как оплатить:</b>\n"
-        "1. Откройте MBank\n"
+        "1. Откройте Бакай Банк\n"
         "2. Переводы → По номеру телефона\n"
         f"3. Введите сумму: <b>{PROMO_PRICE} сом (~$9)</b>\n"
         "4. Переведите и сохраните чек\n"
