@@ -291,16 +291,18 @@ def get_payment_caption(lang: str, plan_name: str, amount_som: int,
                          amount_usd: int, amount_vnd: int) -> str:
     """Текст инструкции по оплате на нужном языке."""
     if lang == "kk":
+        kzt_map = {11: 5800, 28: 14700, 57: 29900, 102: 53500}
+        amount_kzt = kzt_map.get(amount_usd, amount_usd * 525)
         return (
-            f"💳 <b>Төлем: {plan_name} — {amount_som:,} сом (~${amount_usd})</b>\n\n"
-            f"<b>{amount_som:,} сом</b> Бакай Банкке аударыңыз:\n\n"
+            f"💳 <b>Төлем: {plan_name} — {amount_kzt:,} теңге (~${amount_usd})</b>\n\n"
+            f"<b>{amount_kzt:,} теңге</b> Бакай Банкке аударыңыз:\n\n"
             f"👤 <b>{MBANK_NAME}</b>\n"
             f"📱 <b>{MBANK_PHONE}</b>\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "📌 <b>Төлем жасау:</b>\n"
             "1. Бакай Банк қолданбасын ашыңыз\n"
             "2. Аударымдар → Телефон нөмірі бойынша\n"
-            f"3. Сумма: <b>{amount_som:,} сом (~${amount_usd})</b>\n"
+            f"3. Сумма: <b>{amount_kzt:,} теңге (~${amount_usd})</b>\n"
             "4. Аударыңыз және чекті сақтаңыз\n"
             "5. Скриншотты осы жерге жіберіңіз\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
@@ -537,12 +539,19 @@ def plans_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
             ("📅 6 tháng — 1,450,000 VND (~$57) · -25%", "buy_6m"),
             ("📅 1 năm — 2,600,000 VND (~$102) · -35% 🔥","buy_1y"),
         ]
-    elif lang in ("ky", "kk"):
+    elif lang == "ky":
         labels = [
             ("📅 1 ай — 990 сом (~$11)",              "buy_1m"),
             ("📅 3 ай — 2,490 сом (~$28) · -15%",     "buy_3m"),
             ("📅 6 ай — 4,990 сом (~$57) · -25%",     "buy_6m"),
             ("📅 1 жыл — 8,990 сом (~$102) · -35% 🔥","buy_1y"),
+        ]
+    elif lang == "kk":
+        labels = [
+            ("📅 1 ай — 5,800 теңге (~$11)",              "buy_1m"),
+            ("📅 3 ай — 14,700 теңге (~$28) · -15%",     "buy_3m"),
+            ("📅 6 ай — 29,900 теңге (~$57) · -25%",     "buy_6m"),
+            ("📅 1 жыл — 53,500 теңге (~$102) · -35% 🔥","buy_1y"),
         ]
     else:  # ru
         labels = [
