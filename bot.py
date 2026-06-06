@@ -262,6 +262,11 @@ DEFAULT_MODE = "natural"  # режим по умолчанию
 _user_mode: dict = {}  # uid → mode_key
 
 # Флаг активной акции — устанавливается через /promo
+# ══ РЕЖИМ ОБСЛУЖИВАНИЯ ══════════════════════════════════════════════════════
+# Поставь True чтобы новые пользователи видели уведомление о неполадках
+MAINTENANCE_MODE = True
+# ═════════════════════════════════════════════════════════════════════════════
+
 # promo_active_until = None или datetime когда акция заканчивается
 _promo_until: float = 0.0  # unix timestamp конца акции
 _PROMO_FILE = Path(__file__).parent / ".promo_until"
@@ -618,6 +623,60 @@ async def cmd_start(message: Message, state: FSMContext):
     )
     # Определяем язык — если уже выбран вручную, не меняем
     lang = await get_user_language(message.from_user.id)
+
+    # ── Режим обслуживания ────────────────────────────────────────────────────
+    if MAINTENANCE_MODE:
+        MAINT_TEXTS = {
+            "ru": (
+                "⚠️ <b>Технические неполадки</b>\n\n"
+                "Сейчас у нас возникли технические неполадки.\n"
+                "Бот временно работает с ограничениями.\n\n"
+                "Мы уже работаем над решением —\n"
+                "всё будет исправлено к завтрашнему вечеру. 🛠\n\n"
+                "Спасибо за понимание 🙏\n"
+                "Retouch Lab скоро вернётся в полную силу! ✨"
+            ),
+            "ky": (
+                "⚠️ <b>Техникалык көйгөйлөр</b>\n\n"
+                "Учурда бизде техникалык көйгөйлөр чыкты.\n"
+                "Бот убактылуу чектелген иштейт.\n\n"
+                "Биз чечүү үстүндөбүз —\n"
+                "эртең кечке чейин баары оңолот. 🛠\n\n"
+                "Чыдамдуулугуңуз үчүн рахмат 🙏\n"
+                "Retouch Lab жакында толук иштейт! ✨"
+            ),
+            "kk": (
+                "⚠️ <b>Техникалық ақаулар</b>\n\n"
+                "Қазір бізде техникалық ақаулар туындады.\n"
+                "Бот уақытша шектеулі жұмыс істеп тұр.\n\n"
+                "Біз шешу үстіндеміз —\n"
+                "ертең кешке дейін бәрі түзеледі. 🛠\n\n"
+                "Түсіністігіңіз үшін рахмет 🙏\n"
+                "Retouch Lab жақында толық оралады! ✨"
+            ),
+            "en": (
+                "⚠️ <b>Technical issues</b>\n\n"
+                "We are currently experiencing technical issues.\n"
+                "The bot is temporarily working with limitations.\n\n"
+                "We are already working on a fix —\n"
+                "everything will be resolved by tomorrow evening. 🛠\n\n"
+                "Thank you for your patience 🙏\n"
+                "Retouch Lab will be back to full power soon! ✨"
+            ),
+            "vi": (
+                "⚠️ <b>Sự cố kỹ thuật</b>\n\n"
+                "Hiện tại chúng tôi đang gặp sự cố kỹ thuật.\n"
+                "Bot tạm thời hoạt động với các hạn chế.\n\n"
+                "Chúng tôi đang khắc phục —\n"
+                "mọi thứ sẽ được giải quyết vào tối mai. 🛠\n\n"
+                "Cảm ơn sự kiên nhẫn của bạn 🙏\n"
+                "Retouch Lab sẽ sớm hoạt động đầy đủ! ✨"
+            ),
+        }
+        maint_text = MAINT_TEXTS.get(lang or "ru", MAINT_TEXTS["ru"])
+        await message.answer(maint_text, parse_mode="HTML")
+        return
+    # ── Конец режима обслуживания ─────────────────────────────────────────────
     if not lang or lang == "ru":
         # Для новых пользователей — определяем по Telegram language_code
         tg_lang = (message.from_user.language_code or "").lower()
@@ -2258,6 +2317,157 @@ async def callback_set_language(callback: CallbackQuery):
         parse_mode="HTML",
     )
 
+
+
+
+@dp.message(Command("notify"))
+async def cmd_notify(message: Message):
+    """Рассылка технического уведомления ВСЕМ пользователям. Только админ."""
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    all_users = await get_all_users()
+    total = len(all_users)
+
+    NOTIFY_TEXTS = {
+        "ru": (
+            "⚠️ <b>Технические неполадки</b>\n\n"
+            "Сейчас у нас возникли технические неполадки.\n"
+            "Бот временно работает с ограничениями.\n\n"
+            "Мы уже работаем над решением — всё будет исправлено к завтрашнему вечеру. 🛠\n\n"
+            "Спасибо за понимание и терпение 🙏\n"
+            "Retouch Lab скоро вернётся в полную силу! ✨"
+        ),
+        "ky": (
+            "⚠️ <b>Техникалык көйгөйлөр</b>\n\n"
+            "Учурда бизде техникалык көйгөйлөр чыкты.\n"
+            "Бот убактылуу чектелген иштейт.\n\n"
+            "Биз чечүү үстүндөбүз — эртең кечке чейин баары оңолот. 🛠\n\n"
+            "Чыдамдуулугуңуз үчүн рахмат 🙏\n"
+            "Retouch Lab жакында толук иштейт! ✨"
+        ),
+        "kk": (
+            "⚠️ <b>Техникалық ақаулар</b>\n\n"
+            "Қазір бізде техникалық ақаулар туындады.\n"
+            "Бот уақытша шектеулі жұмыс істеп тұр.\n\n"
+            "Біз шешу үстіндеміз — ертең кешке дейін бәрі түзеледі. 🛠\n\n"
+            "Түсіністік пен шыдамдылығыңыз үшін рахмет 🙏\n"
+            "Retouch Lab жақында толық оралады! ✨"
+        ),
+        "en": (
+            "⚠️ <b>Technical issues</b>\n\n"
+            "We are currently experiencing technical issues.\n"
+            "The bot is temporarily working with limitations.\n\n"
+            "We are already working on a fix — everything will be resolved by tomorrow evening. 🛠\n\n"
+            "Thank you for your understanding and patience 🙏\n"
+            "Retouch Lab will be back to full power soon! ✨"
+        ),
+        "vi": (
+            "⚠️ <b>Sự cố kỹ thuật</b>\n\n"
+            "Hiện tại chúng tôi đang gặp sự cố kỹ thuật.\n"
+            "Bot tạm thời hoạt động với các hạn chế.\n\n"
+            "Chúng tôi đang khắc phục — mọi thứ sẽ được giải quyết vào tối mai. 🛠\n\n"
+            "Cảm ơn sự thông cảm và kiên nhẫn của bạn 🙏\n"
+            "Retouch Lab sẽ sớm hoạt động đầy đủ! ✨"
+        ),
+    }
+
+    # Показываем превью
+    preview_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Отправить всем", callback_data="notify_confirm")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="notify_cancel")],
+    ])
+    await message.answer(
+        f"📢 <b>Рассылка уведомления</b>\n\n"
+        f"Получателей: <b>{total}</b> (все пользователи)\n\n"
+        f"Текст (RU):\n{NOTIFY_TEXTS['ru']}\n\n"
+        f"Отправить?",
+        reply_markup=preview_kb,
+        parse_mode="HTML",
+    )
+
+
+@dp.callback_query(F.data == "notify_confirm")
+async def notify_confirmed(callback: CallbackQuery):
+    """Подтверждение рассылки уведомления."""
+    if callback.from_user.id != ADMIN_ID:
+        return
+    await callback.answer()
+
+    NOTIFY_TEXTS = {
+        "ru": (
+            "⚠️ <b>Технические неполадки</b>\n\n"
+            "Сейчас у нас возникли технические неполадки.\n"
+            "Бот временно работает с ограничениями.\n\n"
+            "Мы уже работаем над решением — всё будет исправлено к завтрашнему вечеру. 🛠\n\n"
+            "Спасибо за понимание и терпение 🙏\n"
+            "Retouch Lab скоро вернётся в полную силу! ✨"
+        ),
+        "ky": (
+            "⚠️ <b>Техникалык көйгөйлөр</b>\n\n"
+            "Учурда бизде техникалык көйгөйлөр чыкты.\n"
+            "Бот убактылуу чектелген иштейт.\n\n"
+            "Биз чечүү үстүндөбүз — эртең кечке чейин баары оңолот. 🛠\n\n"
+            "Чыдамдуулугуңуз үчүн рахмат 🙏\n"
+            "Retouch Lab жакында толук иштейт! ✨"
+        ),
+        "kk": (
+            "⚠️ <b>Техникалық ақаулар</b>\n\n"
+            "Қазір бізде техникалық ақаулар туындады.\n"
+            "Бот уақытша шектеулі жұмыс істеп тұр.\n\n"
+            "Біз шешу үстіндеміз — ертең кешке дейін бәрі түзеледі. 🛠\n\n"
+            "Түсіністік пен шыдамдылығыңыз үшін рахмет 🙏\n"
+            "Retouch Lab жақында толық оралады! ✨"
+        ),
+        "en": (
+            "⚠️ <b>Technical issues</b>\n\n"
+            "We are currently experiencing technical issues.\n"
+            "The bot is temporarily working with limitations.\n\n"
+            "We are already working on a fix — everything will be resolved by tomorrow evening. 🛠\n\n"
+            "Thank you for your understanding and patience 🙏\n"
+            "Retouch Lab will be back to full power soon! ✨"
+        ),
+        "vi": (
+            "⚠️ <b>Sự cố kỹ thuật</b>\n\n"
+            "Hiện tại chúng tôi đang gặp sự cố kỹ thuật.\n"
+            "Bot tạm thời hoạt động với các hạn chế.\n\n"
+            "Chúng tôi đang khắc phục — mọi thứ sẽ được giải quyết vào tối mai. 🛠\n\n"
+            "Cảm ơn sự thông cảm và kiên nhẫn của bạn 🙏\n"
+            "Retouch Lab sẽ sớm hoạt động đầy đủ! ✨"
+        ),
+    }
+
+    all_users = await get_all_users()
+    sent = blocked = errors = 0
+
+    from aiogram.exceptions import TelegramForbiddenError
+
+    for user in all_users:
+        uid = user["telegram_id"]
+        lang = await get_user_language(uid)
+        text = NOTIFY_TEXTS.get(lang, NOTIFY_TEXTS["ru"])
+        try:
+            await bot.send_message(chat_id=uid, text=text, parse_mode="HTML")
+            sent += 1
+        except TelegramForbiddenError:
+            blocked += 1
+        except Exception:
+            errors += 1
+
+    await callback.message.answer(
+        f"✅ <b>Рассылка завершена!</b>\n\n"
+        f"👥 Отправлено: {sent + blocked + errors}\n"
+        f"✅ Доставлено: {sent}\n"
+        f"🚫 Заблокировали: {blocked}\n"
+        f"❌ Ошибки: {errors}",
+        parse_mode="HTML",
+    )
+
+
+@dp.callback_query(F.data == "notify_cancel")
+async def notify_cancelled(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.edit_text("❌ Рассылка отменена.")
 
 @dp.message(Command("relaunch"))
 async def cmd_relaunch(message: Message):
