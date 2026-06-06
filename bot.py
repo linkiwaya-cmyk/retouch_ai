@@ -1954,12 +1954,73 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
 
-    promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(
-            text="🔥 Купить за 799 сом (~$9)",
-            callback_data="buy_promo_1m"
-        )
-    ]])
+    # Тексты акции по языкам
+    PROMO_TEXTS_SEND = {
+        "ru": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>С Ч А С Т Л И В Ы Е   Ч А С Ы</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Только сегодня — подписка на 1 месяц</i>\n\n"
+            "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
+            "✦ Неограниченная AI-ретушь\n"
+            "✦ Оригинальное разрешение 4K / 24MP\n"
+            "✦ 5 режимов обработки\n\n"
+            "⏰ <b>Акция действует 24 часа</b>"
+        ),
+        "ky": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>Б А К Ы Т Т У У   С А А Т Т А Р</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Бүгүн гана — 1 айлык жазылуу</i>\n\n"
+            "💎 <b>799 сом</b>  <s>999 сом</s>\n\n"
+            "✦ Чексиз AI ретуши\n"
+            "✦ Оригинал сапат 4K / 24MP\n"
+            "✦ 5 иштетүү режими\n\n"
+            "⏰ <b>Акция 24 саат</b>"
+        ),
+        "kk": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>Б А Қ Ы Т Т Ы   С А Ғ А Т Т А Р</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Бүгін ғана — 1 айлық жазылым</i>\n\n"
+            "💎 <b>4,500 теңге</b>  <s>5,999 теңге</s>\n\n"
+            "✦ Шексіз AI ретушь\n"
+            "✦ Бастапқы сапат 4K / 24MP\n"
+            "✦ 5 өңдеу режимі\n\n"
+            "⏰ <b>Акция 24 сағат</b>"
+        ),
+        "en": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>H A P P Y   H O U R S</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Today only — 1 month subscription</i>\n\n"
+            "💎 <b>$9 USDT</b>  <s>$12</s>\n\n"
+            "✦ Unlimited AI retouching\n"
+            "✦ Original quality 4K / 24MP\n"
+            "✦ 5 processing modes\n\n"
+            "⏰ <b>Offer valid 24 hours</b>"
+        ),
+        "vi": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>G I Ờ   V À N G</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Chỉ hôm nay — đăng ký 1 tháng</i>\n\n"
+            "💎 <b>250,000 VND</b>  <s>299,000 VND</s>\n\n"
+            "✦ Retouch AI không giới hạn\n"
+            "✦ Chất lượng gốc 4K / 24MP\n"
+            "✦ 5 chế độ xử lý\n\n"
+            "⏰ <b>Ưu đãi có hiệu lực 24 giờ</b>"
+        ),
+    }
+
+    # Кнопки на языке пользователя
+    PROMO_BTN_LABELS = {
+        "ru": "🔥 Купить за 799 руб",
+        "ky": "🔥 799 сомго сатып ал",
+        "kk": "🔥 4,500 теңгеге сатып алу",
+        "en": "🔥 Buy for $9 USDT",
+        "vi": "🔥 Mua với giá 250,000 VND",
+    }
 
     status_msg = await callback.message.answer(
         f"🚀 <b>Акционная рассылка запущена...</b>\n"
@@ -1973,7 +2034,11 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
     for i, uid in enumerate(target_ids):
         try:
             user_lang = await get_user_language(uid)
-            user_promo = PROMO_TEXTS.get(user_lang, PROMO_TEXTS["ru"])
+            user_promo = PROMO_TEXTS_SEND.get(user_lang, PROMO_TEXTS_SEND["ru"])
+            btn_text = PROMO_BTN_LABELS.get(user_lang, PROMO_BTN_LABELS["ru"])
+            promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text=btn_text, callback_data="buy_promo_1m")
+            ]])
             await bot.send_message(
                 chat_id=uid,
                 text=user_promo,
