@@ -486,7 +486,7 @@ def make_main_menu(lang: str = "ru", remaining: int = 0,
 
     # Кнопка акции
     if promo_active and not has_sub:
-        rows.append([KeyboardButton(text="🔥 Акция — 799 сом (~$9)")])
+        rows.append([KeyboardButton(text="🔥 Акция — 799 руб")])
 
     # Основные кнопки
     rows += [
@@ -627,7 +627,7 @@ async def cmd_start(message: Message, state: FSMContext):
         trial_btn = f"🎁 Попробовать бесплатно (осталось {remaining} из {TRIAL_LIMIT})"
     elif promo_active:
         # Бесплатные закончились + акция активна
-        trial_btn = "🔥 Акция — 799 сом (~$9)"
+        trial_btn = "🔥 Акция — 799 руб"
     else:
         trial_btn = "💎 Купить подписку"
 
@@ -643,7 +643,7 @@ async def cmd_start(message: Message, state: FSMContext):
 
     # Кнопка акции — только если активна и нет подписки
     if promo_active and not has_sub:
-        menu_rows.append([KeyboardButton(text="🔥 Акция — 799 сом (~$9)")])
+        menu_rows.append([KeyboardButton(text="🔥 Акция — 799 руб")])
 
     # Основные кнопки — всегда
     menu_rows += [
@@ -692,7 +692,7 @@ async def cmd_start(message: Message, state: FSMContext):
 # Меню
 # ══════════════════════════════════════════════════════════════════════════════
 
-@dp.message(F.text.in_({"🔥 Акция — 799 сом (~$9)", "🔥 999 сомға сатып алу (~$9)"}))
+@dp.message(F.text.in_({"🔥 Акция — 799 руб", "🔥 999 сомға сатып алу (~$9)"}))
 async def menu_promo_start(message: Message, state: FSMContext):
     """Кнопка акции в главном меню — показывает акционное предложение."""
     import time as _time
@@ -704,7 +704,7 @@ async def menu_promo_start(message: Message, state: FSMContext):
 
     promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
-            text="🔥 Купить за 799 сом (~$9)",
+            text="🔥 Купить за 799 руб",
             callback_data="buy_promo_1m"
         )
     ]])
@@ -1132,15 +1132,15 @@ async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
     caption = (
-        f"🔥 <b>Акция: {plan_name} — {PROMO_PRICE} сом (~$9)</b>\n\n"
-        f"Переведите <b>{PROMO_PRICE} сом</b> в Бакай Банк:\n\n"
+        f"🔥 <b>Акция: {plan_name} — {PROMO_PRICE} руб</b>\n\n"
+        f"Переведите <b>{PROMO_PRICE} руб</b> в Бакай Банк:\n\n"
         f"👤 <b>{MBANK_NAME}</b>\n"
         f"📱 <b>{MBANK_PHONE}</b>\n\n"
         "━━━━━━━━━━━━━━━━━━\n"
         "📌 <b>Как оплатить:</b>\n"
         "1. Откройте Бакай Банк\n"
         "2. Переводы → По номеру телефона\n"
-        f"3. Введите сумму: <b>{PROMO_PRICE} сом (~$9)</b>\n"
+        f"3. Сумма: <b>{PROMO_PRICE} руб</b>\n"
         "4. Переведите и сохраните чек\n"
         "5. Отправьте скриншот сюда 👇\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
@@ -1306,7 +1306,7 @@ async def recv_screenshot(message: Message, state: FSMContext):
         f"👤 {user.first_name} ({username_str})\n"
         f"🆔 <code>{user.id}</code>\n\n"
         f"📅 Тариф: <b>{plan_name}</b>\n"
-        f"💰 Сумма: <b>{amount:,} сом</b>\n"
+        f"💰 Сумма: <b>{amount:,} руб</b>\n"
         f"{ocr_text}\n\n"
         "Проверьте перевод и подтвердите 👇"
     )
@@ -1459,9 +1459,9 @@ def _limit_exceeded_text() -> str:
     return (
         "💎 <b>Бесплатные обработки использованы</b>\n\n"
         "💡 <b>Посчитай сам:</b>\n"
-        "Ретушёр берёт 300–1500 сом за одно фото.\n"
-        "Retouch Lab — 999 сом в месяц без ограничений.\n\n"
-        "⏰ <b>Акция:</b> первый месяц за <b>799 сом</b>\n\n"
+        "Ретушёр берёт 300–1500 руб за одно фото.\n"
+        "Retouch Lab — 999 руб в месяц без ограничений.\n\n"
+        "⏰ <b>Акция:</b> первый месяц за <b>799 руб</b>\n\n"
         "Выбери тариф 👇"
     )
 
@@ -1744,7 +1744,7 @@ async def cmd_admin(message: Message):
         text += (
             f"#{p['id']} — {p['first_name']} ({username_str})\n"
             f"   📅 {PLAN_NAMES.get(p['plan_type'], p['plan_type'])} · "
-            f"{p['amount']:,} сом · {p['created_at'][:16]}\n\n"
+            f"{p['amount']:,} руб · {p['created_at'][:16]}\n\n"
         )
 
     await message.answer(text, parse_mode="HTML")
@@ -1825,7 +1825,7 @@ async def cmd_promo(message: Message, state: FSMContext):
     # Кнопка "Купить за 799 сом" — только в акции, не в обычных тарифах
     promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
-            text="🔥 Купить за 799 сом (~$9)",
+            text="🔥 Купить за 799 руб",
             callback_data="buy_promo_1m"
         )
     ]])
@@ -1849,7 +1849,7 @@ async def cmd_promo(message: Message, state: FSMContext):
             "<b>С А А Т Т А Р</b>\n"
             "🔥 ——————————————— 🔥\n\n"
             "<i>Бүгүн гана — 1 айлык жазылуу</i>\n\n"
-            "💎 <b>799 сом</b>  <s>999 сом</s>\n\n"
+            "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
             "✦ Чексиз AI ретуши\n"
             "✦ Оригинал сапат 4K / 24MP\n"
             "✦ 5 иштетүү режими\n\n"
@@ -1933,7 +1933,7 @@ async def cmd_promo(message: Message, state: FSMContext):
         f"💎 Пропущены (есть подписка): <b>{len(all_users) - len(target_ids)}</b>\n\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"{PROMO_TEXT}\n\n"
-        f"[кнопка: 🔥 Купить за 799 сом (~$9)]\n"
+        f"[кнопка: 🔥 Купить за 799 руб]\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
         f"Отправить?",
         reply_markup=confirm_kb,
@@ -1972,7 +1972,7 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
             "<b>Б А К Ы Т Т У У   С А А Т Т А Р</b>\n"
             "🔥 ——————————————— 🔥\n\n"
             "<i>Бүгүн гана — 1 айлык жазылуу</i>\n\n"
-            "💎 <b>799 сом</b>  <s>999 сом</s>\n\n"
+            "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
             "✦ Чексиз AI ретуши\n"
             "✦ Оригинал сапат 4K / 24MP\n"
             "✦ 5 иштетүү режими\n\n"
