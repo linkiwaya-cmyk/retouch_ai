@@ -16,7 +16,7 @@ DB_PATH = Path(__file__).parent / "retouch_lab.db"
 TRIAL_LIMIT = 3  # максимум бесплатных обработок
 
 PLAN_DAYS   = {"1m": 30,  "3m": 90,  "6m": 180, "1y": 365}
-PLAN_PRICES = {"1m": 990, "3m": 2490,"6m": 4990,"1y": 8990}
+PLAN_PRICES = {"1m": 999, "3m": 2499,"6m": 4999,"1y": 8999}
 PLAN_NAMES  = {"1m": "1 месяц","3m": "3 месяца","6m": "6 месяцев","1y": "1 год"}
 
 PLAN_NAMES_LANG = {
