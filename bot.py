@@ -264,6 +264,25 @@ _user_mode: dict = {}  # uid → mode_key
 # Флаг активной акции — устанавливается через /promo
 # promo_active_until = None или datetime когда акция заканчивается
 _promo_until: float = 0.0  # unix timestamp конца акции
+_PROMO_FILE = Path(__file__).parent / ".promo_until"
+
+def _load_promo():
+    """Загружаем время акции из файла при старте."""
+    global _promo_until
+    try:
+        if _PROMO_FILE.exists():
+            _promo_until = float(_PROMO_FILE.read_text().strip())
+    except Exception:
+        _promo_until = 0.0
+
+def _save_promo():
+    """Сохраняем время акции в файл."""
+    try:
+        _PROMO_FILE.write_text(str(_promo_until))
+    except Exception:
+        pass
+
+_load_promo()  # Загружаем при старте
 # GROUP_CHAT_ID — отдельная группа куда приходят чеки с кнопками approve/reject
 # Получить: создай группу → добавь бота → напиши /start → смотри getUpdates
 GROUP_CHAT_ID  = int(os.getenv("GROUP_CHAT_ID", os.getenv("ADMIN_CHAT_ID", "532189427")))
@@ -692,7 +711,7 @@ async def cmd_start(message: Message, state: FSMContext):
 # Меню
 # ══════════════════════════════════════════════════════════════════════════════
 
-@dp.message(F.text.in_({"🔥 Акция — 799 руб", "🔥 999 сомға сатып алу (~$9)"}))
+@dp.message(F.text.in_({"🔥 Акция — 799 руб", "🔥 799 сомго сатып ал", "🔥 4,500 теңгеге сатып алу", "🔥 Buy for $9 USDT", "🔥 Mua với giá 250,000 VND", "🔥 999 сомға сатып алу (~$9)"}))
 async def menu_promo_start(message: Message, state: FSMContext):
     """Кнопка акции в главном меню — показывает акционное предложение."""
     import time as _time
@@ -702,19 +721,11 @@ async def menu_promo_start(message: Message, state: FSMContext):
         await message.answer(_TP["promo_ended"].get(_plang, "⏰ Акция уже завершена."), reply_markup=main_menu)
         return
 
-    promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(
-            text="🔥 Купить за 799 руб",
-            callback_data="buy_promo_1m"
-        )
-    ]])
-
     import datetime
     ends_at = datetime.datetime.fromtimestamp(_promo_until).strftime("%H:%M")
 
     _pslang = await get_user_language(message.from_user.id)
     from texts import TEXTS as _TPS
-    _ps_btn = _TPS["promo_buy_btn"].get(_pslang, _TPS["promo_buy_btn"]["ru"])
     # Кнопка на языке пользователя
     promo_btn_labels = {
         "ru": "🔥 Купить за 799 руб",
@@ -1969,6 +1980,7 @@ async def cmd_promo(message: Message, state: FSMContext):
     import time as _time
     global _promo_until
     _promo_until = _time.time() + 86400  # 24 часа
+    _save_promo()  # Сохраняем чтобы пережило перезапуск
 
     # Получаем только пользователей БЕЗ подписки
     from database import DB_PATH
