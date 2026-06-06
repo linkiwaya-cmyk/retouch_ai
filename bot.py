@@ -35,8 +35,8 @@ from dotenv import load_dotenv
 
 from pipeline import process_image
 # Цены в разных валютах
-PLAN_PRICES_USD = {"1m": 11, "3m": 28, "6m": 57, "1y": 102}
-PLAN_PRICES_VND = {"1m": 280000, "3m": 710000, "6m": 1450000, "1y": 2600000}
+PLAN_PRICES_USD = {"1m": 12, "3m": 29, "6m": 59, "1y": 99}
+PLAN_PRICES_VND = {"1m": 299000, "3m": 749000, "6m": 1499000, "1y": 2699000}
 
 from database import (
     init_db,
@@ -342,10 +342,10 @@ def get_payment_caption(lang: str, plan_name: str, amount_som: int,
             "⏳ Subscription activates within a few minutes."
         )
     else:
-        # RU / KY — Бакай Банк
+        # RU — рубли
         return (
-            f"💳 <b>Оплата: {plan_name} — {amount_som:,} сом (~${amount_usd})</b>\n\n"
-            f"Переведите <b>{amount_som:,} сом</b> в Бакай Банк:\n\n"
+            f"💳 <b>Оплата: {plan_name} — {amount_som:,} руб</b>\n\n"
+            f"Переведите <b>{amount_som:,} руб</b> в Бакай Банк:\n\n"
             f"👤 <b>{MBANK_NAME}</b>\n"
             f"📱 <b>{MBANK_PHONE}</b>\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
@@ -527,38 +527,38 @@ def plans_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """Кнопки тарифов на языке пользователя."""
     if lang == "en":
         labels = [
-            ("📅 1 month — $11",              "buy_1m"),
-            ("📅 3 months — $28 · -15%",       "buy_3m"),
-            ("📅 6 months — $57 · -25%",       "buy_6m"),
-            ("📅 1 year — $102 · -35% 🔥",     "buy_1y"),
+            ("📅 1 month — $12",              "buy_1m"),
+            ("📅 3 months — $29 · -15%",       "buy_3m"),
+            ("📅 6 months — $59 · -25%",       "buy_6m"),
+            ("📅 1 year — $99 · -35% 🔥",     "buy_1y"),
         ]
     elif lang == "vi":
         labels = [
-            ("📅 1 tháng — 280,000 VND (~$11)",          "buy_1m"),
-            ("📅 3 tháng — 710,000 VND (~$28) · -15%",   "buy_3m"),
-            ("📅 6 tháng — 1,450,000 VND (~$57) · -25%", "buy_6m"),
-            ("📅 1 năm — 2,600,000 VND (~$102) · -35% 🔥","buy_1y"),
+            ("📅 1 tháng — 299,000 VND (~$12)",          "buy_1m"),
+            ("📅 3 tháng — 749,000 VND (~$29) · -15%",   "buy_3m"),
+            ("📅 6 tháng — 1,499,000 VND (~$59) · -25%", "buy_6m"),
+            ("📅 1 năm — 2,699,000 VND (~$99) · -35% 🔥","buy_1y"),
         ]
     elif lang == "ky":
         labels = [
-            ("📅 1 ай — 990 сом (~$11)",              "buy_1m"),
-            ("📅 3 ай — 2,490 сом (~$28) · -15%",     "buy_3m"),
-            ("📅 6 ай — 4,990 сом (~$57) · -25%",     "buy_6m"),
-            ("📅 1 жыл — 8,990 сом (~$102) · -35% 🔥","buy_1y"),
+            ("📅 1 ай — 999 сом (~$12)",              "buy_1m"),
+            ("📅 3 ай — 2,490 сом (~$29) · -15%",     "buy_3m"),
+            ("📅 6 ай — 4,999 сом (~$59) · -25%",     "buy_6m"),
+            ("📅 1 жыл — 8,999 сом (~$99) · -35% 🔥","buy_1y"),
         ]
     elif lang == "kk":
         labels = [
-            ("📅 1 ай — 5,800 теңге (~$11)",              "buy_1m"),
-            ("📅 3 ай — 14,700 теңге (~$28) · -15%",     "buy_3m"),
-            ("📅 6 ай — 29,900 теңге (~$57) · -25%",     "buy_6m"),
-            ("📅 1 жыл — 53,500 теңге (~$102) · -35% 🔥","buy_1y"),
+            ("📅 1 ай — 5,999 теңге (~$12)",              "buy_1m"),
+            ("📅 3 ай — 14,999 теңге (~$29) · -15%",     "buy_3m"),
+            ("📅 6 ай — 29,999 теңге (~$59) · -25%",     "buy_6m"),
+            ("📅 1 жыл — 53,999 теңге (~$99) · -35% 🔥","buy_1y"),
         ]
     else:  # ru
         labels = [
-            (f"📅 1 месяц — {PLAN_PRICES['1m']:,} сом (~$11)",       "buy_1m"),
-            (f"📅 3 месяца — {PLAN_PRICES['3m']:,} сом (~$28) · -15%","buy_3m"),
-            (f"📅 6 месяцев — {PLAN_PRICES['6m']:,} сом (~$57) · -25%","buy_6m"),
-            (f"📅 1 год — {PLAN_PRICES['1y']:,} сом (~$102) · -35% 🔥","buy_1y"),
+            (f"📅 1 месяц — {PLAN_PRICES['1m']:,} руб",       "buy_1m"),
+            (f"📅 3 месяца — {PLAN_PRICES['3m']:,} руб · -15%","buy_3m"),
+            (f"📅 6 месяцев — {PLAN_PRICES['6m']:,} руб · -25%","buy_6m"),
+            (f"📅 1 год — {PLAN_PRICES['1y']:,} руб · -35% 🔥","buy_1y"),
         ]
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=text, callback_data=cb)]
@@ -687,7 +687,7 @@ async def cmd_start(message: Message, state: FSMContext):
 # Меню
 # ══════════════════════════════════════════════════════════════════════════════
 
-@dp.message(F.text.in_({"🔥 Акция — 799 сом (~$9)", "🔥 990 сомға сатып алу (~$9)"}))
+@dp.message(F.text.in_({"🔥 Акция — 799 сом (~$9)", "🔥 999 сомға сатып алу (~$9)"}))
 async def menu_promo_start(message: Message, state: FSMContext):
     """Кнопка акции в главном меню — показывает акционное предложение."""
     import time as _time
@@ -710,6 +710,15 @@ async def menu_promo_start(message: Message, state: FSMContext):
     _pslang = await get_user_language(message.from_user.id)
     from texts import TEXTS as _TPS
     _ps_btn = _TPS["promo_buy_btn"].get(_pslang, _TPS["promo_buy_btn"]["ru"])
+    # Кнопка на языке пользователя
+    promo_btn_labels = {
+        "ru": "🔥 Купить за 799 руб",
+        "ky": "🔥 799 сомго сатып ал",
+        "kk": "🔥 4,500 теңгеге сатып алу",
+        "en": "🔥 Buy for $9 USDT",
+        "vi": "🔥 Mua với giá 250,000 VND",
+    }
+    _ps_btn = promo_btn_labels.get(_pslang, "🔥 Купить")
     promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text=_ps_btn, callback_data="buy_promo_1m")
     ]])
@@ -1089,15 +1098,11 @@ async def menu_sub(message: Message):
 @dp.callback_query(F.data == "open_plans")
 async def callback_open_plans(callback: CallbackQuery):
     await callback.answer()
+    lang = await get_user_language(callback.from_user.id)
+    from texts import TEXTS as _TOP
+    plans_text = _TOP["sub_plans"].get(lang, _TOP["sub_plans"]["ru"])
     await callback.message.answer(
-        "💎 <b>Подписка Retouch Lab</b>\n\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        f"📅 1 месяц — <b>990 сом</b> (~$11)\n"
-        f"📅 3 месяца — <b>2 490 сом</b> (~$28) · -15%\n"
-        f"📅 6 месяцев — <b>4 990 сом</b> (~$57) · -25%\n"
-        f"📅 1 год — <b>8 990 сом</b> (~$102) · -35% 🔥\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "Выберите тариф 👇",
+        plans_text,
         reply_markup=plans_keyboard(lang),
         parse_mode="HTML",
     )
@@ -1450,7 +1455,7 @@ def _limit_exceeded_text() -> str:
         "💎 <b>Бесплатные обработки использованы</b>\n\n"
         "💡 <b>Посчитай сам:</b>\n"
         "Ретушёр берёт 300–1500 сом за одно фото.\n"
-        "Retouch Lab — 990 сом в месяц без ограничений.\n\n"
+        "Retouch Lab — 999 сом в месяц без ограничений.\n\n"
         "⏰ <b>Акция:</b> первый месяц за <b>799 сом</b>\n\n"
         "Выбери тариф 👇"
     )
@@ -1827,7 +1832,7 @@ async def cmd_promo(message: Message, state: FSMContext):
             "<b>      Ч А С Ы</b>\n"
             "🔥 ——————————————— 🔥\n\n"
             "<i>Только сегодня — подписка на 1 месяц</i>\n\n"
-            "💎 <b>799 сом</b>  <s>990 сом</s>  (~<b>$9</b> вместо $11)\n\n"
+            "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
             "✦ Неограниченная AI-ретушь\n"
             "✦ Оригинальное разрешение 4K / 24MP\n"
             "✦ 5 режимов обработки\n\n"
@@ -1839,18 +1844,29 @@ async def cmd_promo(message: Message, state: FSMContext):
             "<b>С А А Т Т А Р</b>\n"
             "🔥 ——————————————— 🔥\n\n"
             "<i>Бүгүн гана — 1 айлык жазылуу</i>\n\n"
-            "💎 <b>799 сом</b>  <s>990 сом</s>  (~<b>$9</b>)\n\n"
+            "💎 <b>799 сом</b>  <s>999 сом</s>\n\n"
             "✦ Чексиз AI ретуши\n"
             "✦ Оригинал сапат 4K / 24MP\n"
             "✦ 5 иштетүү режими\n\n"
             "⏰ <b>Акция 24 саат</b>"
+        ),
+        "kk": (
+            "🔥 ——————————————— 🔥\n"
+            "<b>Б А Қ Ы Т Т Ы   С А Ғ А Т Т А Р</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Бүгін ғана — 1 айлық жазылым</i>\n\n"
+            "💎 <b>4,500 теңге</b>  <s>5,999 теңге</s>\n\n"
+            "✦ Шексіз AI ретушь\n"
+            "✦ Бастапқы сапат 4K / 24MP\n"
+            "✦ 5 өңдеу режимі\n\n"
+            "⏰ <b>Акция 24 сағат</b>"
         ),
         "en": (
             "🔥 ——————————————— 🔥\n"
             "<b>H A P P Y   H O U R S</b>\n"
             "🔥 ——————————————— 🔥\n\n"
             "<i>Today only — 1 month subscription</i>\n\n"
-            "💎 <b>$9 USDT</b>  <s>$11</s>\n\n"
+            "💎 <b>$9 USDT</b>  <s>$12</s>\n\n"
             "✦ Unlimited AI retouching\n"
             "✦ Original quality 4K / 24MP\n"
             "✦ 5 processing modes\n\n"
@@ -1861,7 +1877,7 @@ async def cmd_promo(message: Message, state: FSMContext):
             "<b>G I Ờ   V À N G</b>\n"
             "🔥 ——————————————— 🔥\n\n"
             "<i>Chỉ hôm nay — đăng ký 1 tháng</i>\n\n"
-            "💎 <b>250,000 VND</b>  <s>280,000 VND</s>  (~$9)\n\n"
+            "💎 <b>250,000 VND</b>  <s>299,000 VND</s>\n\n"
             "✦ Retouch AI không giới hạn\n"
             "✦ Chất lượng gốc 4K / 24MP\n"
             "✦ 5 chế độ xử lý\n\n"
