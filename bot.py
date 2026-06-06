@@ -719,7 +719,7 @@ async def cmd_start(message: Message, state: FSMContext):
 # Меню
 # ══════════════════════════════════════════════════════════════════════════════
 
-@dp.message(F.text.in_({"🔥 Акция — 799 руб", "🔥 799 сомго сатып ал", "🔥 4,500 теңгеге сатып алу", "🔥 Buy for $9 USDT", "🔥 Mua với giá 250,000 VND", "🔥 999 сомға сатып алу (~$9)"}))
+@dp.message(F.text.in_({"🔥 Акция — 799 руб", "🔥 Акция — 799 сом", "🔥 Акция — 4,500 теңге", "🔥 Happy Hours — $9 USDT", "🔥 Giờ Vàng — 250,000 VND", "🔥 799 сомго сатып ал", "🔥 4,500 теңгеге сатып алу", "🔥 Buy for $9 USDT", "🔥 Mua với giá 250,000 VND", "🔥 999 сомға сатып алу (~$9)"}))
 async def menu_promo_start(message: Message, state: FSMContext):
     """Кнопка акции в главном меню — показывает акционное предложение."""
     import time as _time
