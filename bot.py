@@ -505,7 +505,7 @@ def make_main_menu(lang: str = "ru", remaining: int = 0,
 
     # Кнопка акции
     if promo_active and not has_sub:
-        rows.append([KeyboardButton(text="🔥 Акция — 799 руб")])
+        rows.append([KeyboardButton(text=PROMO_BTN_TEXTS.get(lang, PROMO_BTN_TEXTS["ru"]))])
 
     # Основные кнопки
     rows += [
@@ -529,6 +529,14 @@ BACK_TEXTS = {
     "vi": "⬅️ Quay lại",
     "ky": "⬅️ Артка",
     "kk": "⬅️ Артқа",
+}
+
+PROMO_BTN_TEXTS = {
+    "ru": "🔥 Акция — 799 руб",
+    "ky": "🔥 Акция — 799 сом",
+    "kk": "🔥 Акция — 4,500 теңге",
+    "en": "🔥 Happy Hours — $9 USDT",
+    "vi": "🔥 Giờ Vàng — 250,000 VND",
 }
 
 BACK_TO_MODES_TEXTS = {
@@ -646,7 +654,7 @@ async def cmd_start(message: Message, state: FSMContext):
         trial_btn = f"🎁 Попробовать бесплатно (осталось {remaining} из {TRIAL_LIMIT})"
     elif promo_active:
         # Бесплатные закончились + акция активна
-        trial_btn = "🔥 Акция — 799 руб"
+        trial_btn = PROMO_BTN_TEXTS.get(lang, PROMO_BTN_TEXTS["ru"])
     else:
         trial_btn = "💎 Купить подписку"
 
@@ -662,7 +670,7 @@ async def cmd_start(message: Message, state: FSMContext):
 
     # Кнопка акции — только если активна и нет подписки
     if promo_active and not has_sub:
-        menu_rows.append([KeyboardButton(text="🔥 Акция — 799 руб")])
+        menu_rows.append([KeyboardButton(text=PROMO_BTN_TEXTS.get(lang, PROMO_BTN_TEXTS["ru"]))])
 
     # Основные кнопки — всегда
     menu_rows += [
