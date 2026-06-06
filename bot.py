@@ -794,7 +794,7 @@ async def menu_support(message: Message):
     from texts import TEXTS
     lang = await get_user_language(message.from_user.id)
     txt = TEXTS["support_text"].get(lang, TEXTS["support_text"]["ru"])
-    await message.answer(txt, reply_markup=back_menu, parse_mode="HTML")
+    await message.answer(txt, reply_markup=make_back_menu("ru"), parse_mode="HTML")
 
 
 @dp.message(F.text.in_({'🎥 Before / After examples', '🎥 Примеры до / после', '🎥 Мисалдар чейин / кийин', '🎥 Мысалдар дейін / кейін', '🖼 Before / After', '🎥 Ví dụ trước / sau'}))
@@ -827,7 +827,7 @@ async def menu_before_after(message: Message):
                 video=FSInputFile(str(video_path)),
                 caption=DESCRIPTION,
                 parse_mode="HTML",
-                reply_markup=back_menu,
+                reply_markup=make_back_menu("ru"),
                 supports_streaming=True,
                 width=1080,
                 height=1920,
@@ -840,14 +840,15 @@ async def menu_before_after(message: Message):
                     document=FSInputFile(str(video_path)),
                     caption=DESCRIPTION,
                     parse_mode="HTML",
-                    reply_markup=back_menu,
+                    reply_markup=make_back_menu("ru"),
                 )
                 logger.info("[VIDEO] sent as document OK")
             except Exception as e2:
                 logger.error("[VIDEO] document also failed: %s", e2)
+                _ba_lang = await get_user_language(message.from_user.id)
                 await message.answer(
                     DESCRIPTION,
-                    reply_markup=back_menu,
+                    reply_markup=make_back_menu(_ba_lang),
                     parse_mode="HTML",
                 )
         return
@@ -876,7 +877,8 @@ async def menu_before_after(message: Message):
             pass  # убрали лишний стикер
         except Exception as e:
             logger.error("[BEFORE_AFTER] photo send failed: %s", e)
-            await message.answer(DESCRIPTION, reply_markup=back_menu, parse_mode="HTML")
+            _ba2_lang = await get_user_language(message.from_user.id)
+            await message.answer(DESCRIPTION, reply_markup=make_back_menu(_ba2_lang), parse_mode="HTML")
         return
 
     # ── Fallback: нет ни видео ни фото ───────────────────────────────────────
@@ -884,7 +886,7 @@ async def menu_before_after(message: Message):
     _lang = await get_user_language(message.from_user.id)
     await message.answer(
         TEXTS["examples_updating"].get(_lang, TEXTS["examples_updating"]["ru"]),
-        reply_markup=back_menu,
+        reply_markup=make_back_menu("ru"),
         parse_mode="HTML",
     )
 
@@ -1085,7 +1087,7 @@ async def menu_sub(message: Message):
                 plan=get_plan_name(sub["plan_type"], _salang),
                 date=end_pretty
             ),
-            reply_markup=back_menu,
+            reply_markup=make_back_menu("ru"),
             parse_mode="HTML",
         )
         return
@@ -1120,34 +1122,106 @@ async def callback_buy_promo(callback: CallbackQuery, state: FSMContext):
 
     # Проверяем — если уже есть подписка, кнопка не работает
     if await check_active_subscription(uid):
-        await callback.answer("У вас уже есть активная подписка! ✅", show_alert=True)
+        _sub_lang = await get_user_language(uid)
+        _sub_msgs = {
+            "ru": "У вас уже есть активная подписка! ✅",
+            "en": "You already have an active subscription! ✅",
+            "vi": "Bạn đã có đăng ký đang hoạt động! ✅",
+            "ky": "Сизде активдүү жазылуу бар! ✅",
+            "kk": "Сізде белсенді жазылым бар! ✅",
+        }
+        await callback.answer(_sub_msgs.get(_sub_lang, _sub_msgs["ru"]), show_alert=True)
         return
 
     PROMO_PRICE = 799
     plan_type = "1m"
-    plan_name = "1 месяц (акция 🔥)"
+    lang = await get_user_language(callback.from_user.id)
+
+    # Название тарифа и сумма по языку
+    promo_plan_names = {
+        "ru": "1 месяц (акция 🔥)", "ky": "1 ай (акция 🔥)",
+        "kk": "1 ай (акция 🔥)", "en": "1 month (promo 🔥)", "vi": "1 tháng (khuyến mãi 🔥)",
+    }
+    promo_amounts = {
+        "ru": f"{PROMO_PRICE} руб", "ky": f"{PROMO_PRICE} сом",
+        "kk": "4,500 теңге", "en": "$9 USDT", "vi": "250,000 VND",
+    }
+    promo_sub_active = {
+        "ru": "У вас уже есть активная подписка! ✅",
+        "en": "You already have an active subscription! ✅",
+        "vi": "Bạn đã có đăng ký đang hoạt động! ✅",
+        "ky": "Сизде активдүү жазылуу бар! ✅",
+        "kk": "Сізде белсенді жазылым бар! ✅",
+    }
+    plan_name = promo_plan_names.get(lang, promo_plan_names["ru"])
+    amount_str = promo_amounts.get(lang, promo_amounts["ru"])
 
     await state.update_data(plan_type=plan_type)
     await state.set_state(PaymentStates.waiting_screenshot)
     await callback.answer()
 
-    caption = (
-        f"🔥 <b>Акция: {plan_name} — {PROMO_PRICE} руб</b>\n\n"
-        f"Переведите <b>{PROMO_PRICE} руб</b> в Бакай Банк:\n\n"
-        f"👤 <b>{MBANK_NAME}</b>\n"
-        f"📱 <b>{MBANK_PHONE}</b>\n\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "📌 <b>Как оплатить:</b>\n"
-        "1. Откройте Бакай Банк\n"
-        "2. Переводы → По номеру телефона\n"
-        f"3. Сумма: <b>{PROMO_PRICE} руб</b>\n"
-        "4. Переведите и сохраните чек\n"
-        "5. Отправьте скриншот сюда 👇\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "⏳ Подписка активируется в течение нескольких минут."
-    )
-
-    lang = await get_user_language(callback.from_user.id)
+    # caption через get_payment_caption с прomo суммами
+    promo_captions = {
+        "ru": (
+            f"🔥 <b>Акция: {plan_name} — {PROMO_PRICE} руб</b>\n\n"
+            f"👤 <b>{MBANK_NAME}</b>\n"
+            f"📱 <b>{MBANK_PHONE}</b>\n"
+            "💳 <b>4714240068187849</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"1. Номер карты: <b>4714240068187849</b>\n"
+            f"2. Сумма: <b>{PROMO_PRICE} руб</b>\n"
+            "3. Отправьте скриншот сюда 👇\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⏳ Подписка активируется в течение нескольких минут."
+        ),
+        "ky": (
+            f"🔥 <b>Акция: {plan_name} — {PROMO_PRICE} сом</b>\n\n"
+            f"👤 <b>{MBANK_NAME}</b>\n"
+            f"📱 <b>{MBANK_PHONE}</b>\n"
+            "💳 <b>4714240068187849</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"1. Карта номери: <b>4714240068187849</b>\n"
+            f"2. Сумма: <b>{PROMO_PRICE} сом</b>\n"
+            "3. Скриншотту ушул жерге жөнөтүңүз 👇\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⏳ Жазылуу бир нече мүнөттөн кийин активдешет."
+        ),
+        "kk": (
+            f"🔥 <b>Акция: {plan_name} — 4,500 теңге</b>\n\n"
+            f"👤 <b>{MBANK_NAME}</b>\n"
+            f"📱 <b>{MBANK_PHONE}</b>\n"
+            "💳 <b>4714240068187849</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"1. Карта нөмірі: <b>4714240068187849</b>\n"
+            f"2. Сумма: <b>4,500 теңге</b>\n"
+            "3. Скриншотты осы жерге жіберіңіз 👇\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⏳ Жазылым бірнеше минут ішінде белсендіріледі."
+        ),
+        "en": (
+            f"🔥 <b>Promo: {plan_name} — $9 USDT</b>\n\n"
+            f"💎 <b>Wallet (TRC20):</b>\n"
+            f"<code>{USDT_ADDRESS}</code>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "1. Send <b>$9 USDT</b> via TRC20\n"
+            "2. Send screenshot here 👇\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⚠️ TRC20 network only!\n"
+            "⏳ Subscription activates within a few minutes."
+        ),
+        "vi": (
+            f"🔥 <b>Khuyến mãi: {plan_name} — 250,000 VND</b>\n\n"
+            f"👤 <b>{VIETCOMBANK_NAME}</b>\n"
+            f"🏦 Số TK: <b>{VIETCOMBANK_NUM}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "1. Chuyển khoản <b>250,000 VND</b>\n"
+            "2. Ghi chú: <b>retouch</b>\n"
+            "3. Gửi ảnh chụp màn hình tại đây 👇\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⏳ Đăng ký sẽ được kích hoạt trong vài phút."
+        ),
+    }
+    caption = promo_captions.get(lang, promo_captions["ru"])
     qr = get_qr_path(lang)
     from texts import TEXTS as _TCK
 
@@ -1714,7 +1788,7 @@ async def recv_photo(message: Message, state: FSMContext):
     _bl = await get_user_language(message.from_user.id)
     await message.answer(
         _T["photo_blocked"].get(_bl, _T["photo_blocked"]["ru"]),
-        reply_markup=back_menu,
+        reply_markup=make_back_menu("ru"),
         parse_mode="HTML",
     )
 
