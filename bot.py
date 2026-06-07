@@ -264,7 +264,7 @@ _user_mode: dict = {}  # uid → mode_key
 # Флаг активной акции — устанавливается через /promo
 # ══ РЕЖИМ ОБСЛУЖИВАНИЯ ══════════════════════════════════════════════════════
 # Поставь True чтобы новые пользователи видели уведомление о неполадках
-MAINTENANCE_MODE = True
+MAINTENANCE_MODE = False
 # ═════════════════════════════════════════════════════════════════════════════
 
 # promo_active_until = None или datetime когда акция заканчивается
@@ -539,7 +539,7 @@ BACK_TEXTS = {
 PROMO_BTN_TEXTS = {
     "ru": "🔥 Акция — 799 руб",
     "ky": "🔥 Акция — 799 сом",
-    "kk": "🔥 Акция — 4,500 теңге",
+    "kk": "🔥 Акция — 5,200 теңге",
     "en": "🔥 Happy Hours — $9 USDT",
     "vi": "🔥 Giờ Vàng — 250,000 VND",
 }
@@ -795,11 +795,11 @@ async def menu_promo_start(message: Message, state: FSMContext):
     from texts import TEXTS as _TPS
     # Кнопка на языке пользователя
     promo_btn_labels = {
-        "ru": "🔥 Купить за 799 руб",
-        "ky": "🔥 799 сомго сатып ал",
-        "kk": "🔥 4,500 теңгеге сатып алу",
-        "en": "🔥 Buy for $9 USDT",
-        "vi": "🔥 Mua với giá 250,000 VND",
+        "ru": "🎉 Купить за 799 руб",
+        "ky": "🎉 799 сомго сатып ал",
+        "kk": "🎉 5,200 теңгеге сатып алу",
+        "en": "🎉 Buy for $10 USDT",
+        "vi": "🎉 Mua với giá 270,000 VND",
     }
     _ps_btn = promo_btn_labels.get(_pslang, "🔥 Купить")
     promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
@@ -2001,7 +2001,7 @@ async def cmd_promo(message: Message, state: FSMContext):
             "<b>С А А Т Т А Р</b>\n"
             "🔥 ——————————————— 🔥\n\n"
             "<i>Бүгүн гана — 1 айлык жазылуу</i>\n\n"
-            "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
+            "💎 <b>799 сом</b>  <s>999 сом</s>\n\n"
             "✦ Чексиз AI ретуши\n"
             "✦ Оригинал сапат 4K / 24MP\n"
             "✦ 5 иштетүү режими\n\n"
@@ -2009,10 +2009,10 @@ async def cmd_promo(message: Message, state: FSMContext):
         ),
         "kk": (
             "🔥 ——————————————— 🔥\n"
-            "<b>Б А Қ Ы Т Т Ы   С А Ғ А Т Т А Р</b>\n"
-            "🔥 ——————————————— 🔥\n\n"
-            "<i>Бүгін ғана — 1 айлық жазылым</i>\n\n"
-            "💎 <b>4,500 теңге</b>  <s>5,999 теңге</s>\n\n"
+            "<b>БОТ ҚАЛПЫНА КЕЛДІ!</b>\n"
+            "🎉 ——————————————— 🎉\n\n"
+            "<i>Жаңарту аяқталуына орай — арнайы ұсыныс!</i>\n\n"
+            "💎 <b>5,200 теңге</b>  <s>5,999 теңге</s>\n\n"
             "✦ Шексіз AI ретушь\n"
             "✦ Бастапқы сапат 4K / 24MP\n"
             "✦ 5 өңдеу режимі\n\n"
@@ -2020,10 +2020,10 @@ async def cmd_promo(message: Message, state: FSMContext):
         ),
         "en": (
             "🔥 ——————————————— 🔥\n"
-            "<b>H A P P Y   H O U R S</b>\n"
-            "🔥 ——————————————— 🔥\n\n"
-            "<i>Today only — 1 month subscription</i>\n\n"
-            "💎 <b>$9 USDT</b>  <s>$12</s>\n\n"
+            "<b>B O T   I S   B A C K!</b>\n"
+            "🎉 ——————————————— 🎉\n\n"
+            "<i>Special offer to celebrate our update!</i>\n\n"
+            "💎 <b>$10 USDT</b>  <s>$12</s>\n\n"
             "✦ Unlimited AI retouching\n"
             "✦ Original quality 4K / 24MP\n"
             "✦ 5 processing modes\n\n"
@@ -2031,10 +2031,10 @@ async def cmd_promo(message: Message, state: FSMContext):
         ),
         "vi": (
             "🔥 ——————————————— 🔥\n"
-            "<b>G I Ờ   V À N G</b>\n"
-            "🔥 ——————————————— 🔥\n\n"
-            "<i>Chỉ hôm nay — đăng ký 1 tháng</i>\n\n"
-            "💎 <b>250,000 VND</b>  <s>299,000 VND</s>\n\n"
+            "<b>BOT ĐÃ TRỞ LẠI!</b>\n"
+            "🎉 ——————————————— 🎉\n\n"
+            "<i>Ưu đãi đặc biệt nhân dịp cập nhật!</i>\n\n"
+            "💎 <b>270,000 VND</b>  <s>299,000 VND</s>\n\n"
             "✦ Retouch AI không giới hạn\n"
             "✦ Chất lượng gốc 4K / 24MP\n"
             "✦ 5 chế độ xử lý\n\n"
@@ -2111,9 +2111,9 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
     PROMO_TEXTS_SEND = {
         "ru": (
             "🔥 ——————————————— 🔥\n"
-            "<b>С Ч А С Т Л И В Ы Е   Ч А С Ы</b>\n"
-            "🔥 ——————————————— 🔥\n\n"
-            "<i>Только сегодня — подписка на 1 месяц</i>\n\n"
+            "<b>Б О Т   В О С С Т А Н О В Л Е Н!</b>\n"
+            "🎉 ——————————————— 🎉\n\n"
+            "<i>В честь обновления — специальное предложение!</i>\n\n"
             "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
             "✦ Неограниченная AI-ретушь\n"
             "✦ Оригинальное разрешение 4K / 24MP\n"
@@ -2122,10 +2122,10 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
         ),
         "ky": (
             "🔥 ——————————————— 🔥\n"
-            "<b>Б А К Ы Т Т У У   С А А Т Т А Р</b>\n"
-            "🔥 ——————————————— 🔥\n\n"
-            "<i>Бүгүн гана — 1 айлык жазылуу</i>\n\n"
-            "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
+            "<b>БОТ КАЙРА ИШТЕЙТ!</b>\n"
+            "🎉 ——————————————— 🎉\n\n"
+            "<i>Жаңыртуу урматына — атайын сунуш!</i>\n\n"
+            "💎 <b>799 сом</b>  <s>999 сом</s>\n\n"
             "✦ Чексиз AI ретуши\n"
             "✦ Оригинал сапат 4K / 24MP\n"
             "✦ 5 иштетүү режими\n\n"
@@ -2133,10 +2133,10 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
         ),
         "kk": (
             "🔥 ——————————————— 🔥\n"
-            "<b>Б А Қ Ы Т Т Ы   С А Ғ А Т Т А Р</b>\n"
-            "🔥 ——————————————— 🔥\n\n"
-            "<i>Бүгін ғана — 1 айлық жазылым</i>\n\n"
-            "💎 <b>4,500 теңге</b>  <s>5,999 теңге</s>\n\n"
+            "<b>БОТ ҚАЛПЫНА КЕЛДІ!</b>\n"
+            "🎉 ——————————————— 🎉\n\n"
+            "<i>Жаңарту аяқталуына орай — арнайы ұсыныс!</i>\n\n"
+            "💎 <b>5,200 теңге</b>  <s>5,999 теңге</s>\n\n"
             "✦ Шексіз AI ретушь\n"
             "✦ Бастапқы сапат 4K / 24MP\n"
             "✦ 5 өңдеу режимі\n\n"
@@ -2144,10 +2144,10 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
         ),
         "en": (
             "🔥 ——————————————— 🔥\n"
-            "<b>H A P P Y   H O U R S</b>\n"
-            "🔥 ——————————————— 🔥\n\n"
-            "<i>Today only — 1 month subscription</i>\n\n"
-            "💎 <b>$9 USDT</b>  <s>$12</s>\n\n"
+            "<b>B O T   I S   B A C K!</b>\n"
+            "🎉 ——————————————— 🎉\n\n"
+            "<i>Special offer to celebrate our update!</i>\n\n"
+            "💎 <b>$10 USDT</b>  <s>$12</s>\n\n"
             "✦ Unlimited AI retouching\n"
             "✦ Original quality 4K / 24MP\n"
             "✦ 5 processing modes\n\n"
@@ -2155,10 +2155,10 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
         ),
         "vi": (
             "🔥 ——————————————— 🔥\n"
-            "<b>G I Ờ   V À N G</b>\n"
-            "🔥 ——————————————— 🔥\n\n"
-            "<i>Chỉ hôm nay — đăng ký 1 tháng</i>\n\n"
-            "💎 <b>250,000 VND</b>  <s>299,000 VND</s>\n\n"
+            "<b>BOT ĐÃ TRỞ LẠI!</b>\n"
+            "🎉 ——————————————— 🎉\n\n"
+            "<i>Ưu đãi đặc biệt nhân dịp cập nhật!</i>\n\n"
+            "💎 <b>270,000 VND</b>  <s>299,000 VND</s>\n\n"
             "✦ Retouch AI không giới hạn\n"
             "✦ Chất lượng gốc 4K / 24MP\n"
             "✦ 5 chế độ xử lý\n\n"
@@ -2168,11 +2168,11 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
 
     # Кнопки на языке пользователя
     PROMO_BTN_LABELS = {
-        "ru": "🔥 Купить за 799 руб",
-        "ky": "🔥 799 сомго сатып ал",
-        "kk": "🔥 4,500 теңгеге сатып алу",
-        "en": "🔥 Buy for $9 USDT",
-        "vi": "🔥 Mua với giá 250,000 VND",
+        "ru": "🎉 Купить за 799 руб",
+        "ky": "🎉 799 сомго сатып ал",
+        "kk": "🎉 5,200 теңгеге сатып алу",
+        "en": "🎉 Buy for $10 USDT",
+        "vi": "🎉 Mua với giá 270,000 VND",
     }
 
     status_msg = await callback.message.answer(
@@ -2389,75 +2389,146 @@ async def cmd_notify(message: Message):
 
 @dp.callback_query(F.data == "notify_confirm")
 async def notify_confirmed(callback: CallbackQuery):
-    """Подтверждение рассылки уведомления."""
+    """Рассылка: подписчики → призыв отправить фото, остальные → акция 799."""
     if callback.from_user.id != ADMIN_ID:
         return
     await callback.answer()
 
-    NOTIFY_TEXTS = {
+    # Тексты восстановления — для ВСЕХ
+    RESTORE_TEXTS = {
         "ru": (
-            "⚠️ <b>Технические неполадки</b>\n\n"
-            "Сейчас у нас возникли технические неполадки.\n"
-            "Бот временно работает с ограничениями.\n\n"
-            "Мы уже работаем над решением — всё будет исправлено к завтрашнему вечеру. 🛠\n\n"
-            "Спасибо за понимание и терпение 🙏\n"
-            "Retouch Lab скоро вернётся в полную силу! ✨"
+            "✅ <b>Retouch Lab снова работает!</b>\n\n"
+            "Мы провели техническое обновление\n"
+            "Улучшена стабильность и скорость обработки\n\n"
+            "Приносим извинения за доставленные неудобства\n\nСпасибо за ваше терпение 🙏"
         ),
         "ky": (
-            "⚠️ <b>Техникалык көйгөйлөр</b>\n\n"
-            "Учурда бизде техникалык көйгөйлөр чыкты.\n"
-            "Бот убактылуу чектелген иштейт.\n\n"
-            "Биз чечүү үстүндөбүз — эртең кечке чейин баары оңолот. 🛠\n\n"
-            "Чыдамдуулугуңуз үчүн рахмат 🙏\n"
-            "Retouch Lab жакында толук иштейт! ✨"
+            "✅ <b>Retouch Lab кайра иштейт!</b>\n\n"
+            "Биз техникалык жаңыртуу жүргүздүк\n"
+            "Туруктуулук жана иштетүү ылдамдыгы жакшыртылды\n\n"
+            "Ыңгайсыздык үчүн кечирим сурайбыз\n\nЧыдамдуулугуңуз үчүн рахмат 🙏"
         ),
         "kk": (
-            "⚠️ <b>Техникалық ақаулар</b>\n\n"
-            "Қазір бізде техникалық ақаулар туындады.\n"
-            "Бот уақытша шектеулі жұмыс істеп тұр.\n\n"
-            "Біз шешу үстіндеміз — ертең кешке дейін бәрі түзеледі. 🛠\n\n"
-            "Түсіністік пен шыдамдылығыңыз үшін рахмет 🙏\n"
-            "Retouch Lab жақында толық оралады! ✨"
+            "✅ <b>Retouch Lab қайта жұмыс істеп тұр!</b>\n\n"
+            "Біз техникалық жаңарту жүргіздік\n"
+            "Тұрақтылық пен өңдеу жылдамдығы жақсартылды\n\n"
+            "Ыңғайсыздық үшін кешіріңіз\n\nШыдамдылығыңыз үшін рахмет 🙏"
         ),
         "en": (
-            "⚠️ <b>Technical issues</b>\n\n"
-            "We are currently experiencing technical issues.\n"
-            "The bot is temporarily working with limitations.\n\n"
-            "We are already working on a fix — everything will be resolved by tomorrow evening. 🛠\n\n"
-            "Thank you for your understanding and patience 🙏\n"
-            "Retouch Lab will be back to full power soon! ✨"
+            "✅ <b>Retouch Lab is back!</b>\n\n"
+            "We completed a technical update\n"
+            "Stability and processing speed improved\n\n"
+            "We apologize for any inconvenience caused\n\nThank you for your patience 🙏"
         ),
         "vi": (
-            "⚠️ <b>Sự cố kỹ thuật</b>\n\n"
-            "Hiện tại chúng tôi đang gặp sự cố kỹ thuật.\n"
-            "Bot tạm thời hoạt động với các hạn chế.\n\n"
-            "Chúng tôi đang khắc phục — mọi thứ sẽ được giải quyết vào tối mai. 🛠\n\n"
-            "Cảm ơn sự thông cảm và kiên nhẫn của bạn 🙏\n"
-            "Retouch Lab sẽ sớm hoạt động đầy đủ! ✨"
+            "✅ <b>Retouch Lab đã hoạt động trở lại!</b>\n\n"
+            "Chúng tôi đã hoàn thành cập nhật kỹ thuật\n"
+            "Độ ổn định và tốc độ xử lý được cải thiện\n\n"
+            "Chúng tôi xin lỗi vì sự bất tiện đã gây ra\n\nCảm ơn sự kiên nhẫn của bạn 🙏"
         ),
     }
 
-    all_users = await get_all_users()
-    sent = blocked = errors = 0
+    # Призыв отправить фото — для подписчиков
+    SEND_PHOTO_TEXTS = {
+        "ru": "\n\n📸 <b>Отправьте фотографию для обработки!</b>",
+        "ky": "\n\n📸 <b>Иштетүү үчүн сүрөт жибериңиз!</b>",
+        "kk": "\n\n📸 <b>Өңдеу үшін фото жіберіңіз!</b>",
+        "en": "\n\n📸 <b>Send a photo for retouching!</b>",
+        "vi": "\n\n📸 <b>Gửi ảnh để retouch!</b>",
+    }
 
+    # Тексты акции — для тех кто БЕЗ подписки
+    PROMO_799_TEXTS = {
+        "ru": (
+            "\n\n🔥 <b>Счастливые часы</b>\n"
+            "<i>В честь восстановления — специальное предложение!</i>\n\n"
+            "💎 1 месяц за <b>799 руб</b> вместо 999 руб\n\n"
+            "✦ Неограниченная AI-ретушь\n"
+            "✦ 5 режимов · 4K / 24MP"
+        ),
+        "ky": (
+            "\n\n🔥 <b>Бактуу саттар</b>\n"
+            "<i>Калыбына келтирүү урматына — атайын сунуш!</i>\n\n"
+            "💎 1 ай — <b>799 сом</b> (999 сом ордуна)\n\n"
+            "✦ Чексиз AI ретуши\n"
+            "✦ 5 режим · 4K / 24MP"
+        ),
+        "kk": (
+            "\n\n🔥 <b>Бақытты сағаттар</b>\n"
+            "<i>Қалпына келтіру құрметіне — арнайы ұсыныс!</i>\n\n"
+            "💎 1 ай — <b>5,200 теңге</b> (5,999 орнына)\n\n"
+            "✦ Шексіз AI ретушь\n"
+            "✦ 5 режим · 4K / 24MP"
+        ),
+        "en": (
+            "\n\n🔥 <b>Happy Hours</b>\n"
+            "<i>Special offer to celebrate our recovery!</i>\n\n"
+            "💎 1 month for <b>$10 USDT</b> instead of $12\n\n"
+            "✦ Unlimited AI retouching\n"
+            "✦ 5 modes · 4K / 24MP"
+        ),
+        "vi": (
+            "\n\n🔥 <b>Giờ Vàng</b>\n"
+            "<i>Ưu đãi đặc biệt nhân dịp khôi phục!</i>\n\n"
+            "💎 1 tháng — <b>270,000 VND</b> thay vì 299,000\n\n"
+            "✦ Retouch AI không giới hạn\n"
+            "✦ 5 chế độ · 4K / 24MP"
+        ),
+    }
+
+    BUY_BTN_TEXTS = {
+        "ru": "🔥 Купить за 799 руб",
+        "ky": "🔥 799 сомго сатып ал",
+        "kk": "🔥 5,200 теңгеге сатып алу",
+        "en": "🔥 Buy for $10 USDT",
+        "vi": "🔥 Mua với giá 270,000 VND",
+    }
+
+    all_users = await get_all_users()
+    sent_sub = sent_no_sub = blocked = errors = 0
     from aiogram.exceptions import TelegramForbiddenError
 
     for user in all_users:
         uid = user["telegram_id"]
         lang = await get_user_language(uid)
-        text = NOTIFY_TEXTS.get(lang, NOTIFY_TEXTS["ru"])
+        has_sub = bool(await check_active_subscription(uid))
+
+        # Базовый текст — для ВСЕХ одинаковый
+        base_text = RESTORE_TEXTS.get(lang, RESTORE_TEXTS["ru"])
+        # Призыв отправить фото — для ВСЕХ
+        photo_call = SEND_PHOTO_TEXTS.get(lang, SEND_PHOTO_TEXTS["ru"])
+
         try:
-            await bot.send_message(chat_id=uid, text=text, parse_mode="HTML")
-            sent += 1
+            if has_sub:
+                # Подписчик — восстановление + призыв отправить фото (без акции)
+                text = base_text + photo_call
+                await bot.send_message(chat_id=uid, text=text, parse_mode="HTML")
+                sent_sub += 1
+            else:
+                # Без подписки — восстановление + акция + кнопка + призыв фото
+                text = base_text + PROMO_799_TEXTS.get(lang, PROMO_799_TEXTS["ru"]) + photo_call
+                buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(
+                        text=BUY_BTN_TEXTS.get(lang, BUY_BTN_TEXTS["ru"]),
+                        callback_data="buy_promo_1m"
+                    )
+                ]])
+                await bot.send_message(
+                    chat_id=uid, text=text,
+                    reply_markup=buy_kb, parse_mode="HTML"
+                )
+                sent_no_sub += 1
         except TelegramForbiddenError:
             blocked += 1
         except Exception:
             errors += 1
 
+    total = sent_sub + sent_no_sub + blocked + errors
     await callback.message.answer(
         f"✅ <b>Рассылка завершена!</b>\n\n"
-        f"👥 Отправлено: {sent + blocked + errors}\n"
-        f"✅ Доставлено: {sent}\n"
+        f"👥 Всего: {total}\n"
+        f"💎 Подписчики (фото): {sent_sub}\n"
+        f"🆓 Без подписки (акция): {sent_no_sub}\n"
         f"🚫 Заблокировали: {blocked}\n"
         f"❌ Ошибки: {errors}",
         parse_mode="HTML",
