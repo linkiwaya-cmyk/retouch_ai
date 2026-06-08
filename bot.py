@@ -180,7 +180,7 @@ MODES = {
                 {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.5},
                 {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.6},
                 {"Plugin": "Fabric",      "Scale": 0, "Alpha1": 0.12},
-                {"Plugin": "Dodge Burn",  "Scale": 2, "Alpha1": 0.35, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",  "Scale": 1, "Alpha1": 0.25, "Alpha2": 0.0},
             ]
         }
     },
@@ -197,7 +197,7 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.55, "Alpha2": 0.0},
             ]
         }
     },
@@ -214,7 +214,7 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.55},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.18, "Alpha2": 0.18},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.1,  "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.75, "Alpha2": 0.0},
             ]
         }
     },
@@ -232,7 +232,7 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.95},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.65},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.28, "Alpha2": 0.28},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.0,  "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.70, "Alpha2": 0.0},
             ]
         }
     },
@@ -250,7 +250,7 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 1.0},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.38, "Alpha2": 0.38},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.25, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.90, "Alpha2": 0.0},
             ]
         }
     },
@@ -276,8 +276,20 @@ def _load_promo():
     global _promo_until
     try:
         if _PROMO_FILE.exists():
-            _promo_until = float(_PROMO_FILE.read_text().strip())
-    except Exception:
+            val = float(_PROMO_FILE.read_text().strip())
+            import time as _t
+            if val > _t.time():
+                _promo_until = val
+                import datetime as _dt
+                ends = _dt.datetime.fromtimestamp(val).strftime("%Y-%m-%d %H:%M")
+                logger.info("[PROMO] loaded from file, active until %s", ends)
+            else:
+                _promo_until = 0.0
+                logger.info("[PROMO] file exists but promo already expired, resetting")
+        else:
+            _promo_until = 0.0
+    except Exception as e:
+        logger.warning("[PROMO] load error: %s", e)
         _promo_until = 0.0
 
 def _save_promo():
@@ -781,6 +793,9 @@ async def menu_language(message: Message, state: FSMContext):
 
 @dp.message(F.text.in_({'⬅️ Назад', '⬅️ Back', '⬅️ Quay lại', '⬅️ Артка', '⬅️ Артқа', '⬅️ Башкы меню', '⬅️ Басты мәзір', '⬅️ Menu chính', '⬅️ Главное меню', '⬅️ Main menu'}))
 async def back(message: Message, state: FSMContext):
+    uid = message.from_user.id
+    current = await state.get_state()
+    logger.info("[HANDLER] back uid=%d state=%s text=%r", uid, current, message.text)
     await state.clear()
     uid = message.from_user.id
     user_lang = await get_user_language(uid)
@@ -2505,6 +2520,18 @@ async def cmd_cancel_broadcast(message: Message, state: FSMContext):
     await message.answer("❌ Рассылка отменена")
 
 
+@dp.message(Command("cancel"))
+async def cmd_cancel_any(message: Message, state: FSMContext):
+    """Универсальный /cancel — сбрасывает любое состояние."""
+    current = await state.get_state()
+    await state.clear()
+    if current:
+        logger.info("[CANCEL] uid=%d state=%s cleared", message.from_user.id, current)
+        await message.answer("❌ Действие отменено")
+    else:
+        await message.answer("Нет активного действия для отмены")
+
+
 @dp.message(BroadcastStates.waiting_text)
 async def broadcast_got_text(message: Message, state: FSMContext):
     """Получили текст — показываем preview и просим подтверждение."""
@@ -2613,7 +2640,7 @@ async def main():
     scheduler.start()
     logger.info("Scheduler started — daily notifications at 10:00")
 
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, drop_pending_updates=True)
 
 
 if __name__ == "__main__":
