@@ -1,6 +1,6 @@
 import requests, json, time, io, os
 from dotenv import load_dotenv
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageFilter
 import pillow_heif
 
 load_dotenv()
@@ -26,6 +26,10 @@ BASE_URL = "https://cf-retoucher.retouch4.me/api/v1"
 # - Skin Tone Alpha1 only (тон кожи, не всего кадра)
 # - Portrait Volumes (объём лица)
 # - Heal (дефекты кожи)
+#
+# ДОБАВЛЕНО:
+# - Финальный Unsharp Mask после API — восстанавливает резкость
+#   без изменения цвета. Настройки мягкие, не добавляют артефактов.
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Дефолтный пресет — Natural Retouch
@@ -56,10 +60,24 @@ def _save_jpeg(img: Image.Image, quality: int = 100) -> bytes:
     return buf.getvalue()
 
 
+def _apply_sharpening(img: Image.Image) -> Image.Image:
+    """
+    Мягкий Unsharp Mask после ретуши API.
+    Восстанавливает резкость которую API слегка размывает.
+    
+    Параметры UnsharpMask(radius, percent, threshold):
+      radius=1.2   — радиус размытия (меньше = тоньше детали)
+      percent=60   — сила эффекта (60% = мягко, не агрессивно)
+      threshold=3  — порог: пиксели с разницей < 3 не трогаем
+                     (избегаем шумоусиления на гладкой коже)
+    """
+    return img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=60, threshold=3))
+
+
 def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> bytes:
     """
     Отправляет оригинал в API без resize.
-    Никакой постобработки цвета — возвращаем результат API как есть.
+    После получения результата — лёгкий sharpening для восстановления резкости.
     """
     original_img = _open_image(image_bytes)
     original_size = original_img.size
@@ -108,7 +126,9 @@ def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> byt
     if result_img.size != original_size:
         result_img = result_img.resize(original_size, Image.LANCZOS)
 
-    # Никакой постобработки цвета — возвращаем как есть
+    # Мягкий sharpening — возвращает резкость после обработки API
+    result_img = _apply_sharpening(result_img)
+
     return _save_jpeg(result_img, quality=100)
 
 
