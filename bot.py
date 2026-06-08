@@ -280,16 +280,11 @@ def _load_promo():
             import time as _t
             if val > _t.time():
                 _promo_until = val
-                import datetime as _dt
-                ends = _dt.datetime.fromtimestamp(val).strftime("%Y-%m-%d %H:%M")
-                logger.info("[PROMO] loaded from file, active until %s", ends)
             else:
                 _promo_until = 0.0
-                logger.info("[PROMO] file exists but promo already expired, resetting")
         else:
             _promo_until = 0.0
-    except Exception as e:
-        logger.warning("[PROMO] load error: %s", e)
+    except Exception:
         _promo_until = 0.0
 
 def _save_promo():
