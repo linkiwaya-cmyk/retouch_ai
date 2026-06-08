@@ -180,7 +180,7 @@ MODES = {
                 {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.5},
                 {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.6},
                 {"Plugin": "Fabric",      "Scale": 0, "Alpha1": 0.12},
-                {"Plugin": "Dodge Burn",  "Scale": 1, "Alpha1": 0.25, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",  "Scale": 2, "Alpha1": 0.35, "Alpha2": 0.0},
             ]
         }
     },
@@ -197,7 +197,7 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
-                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.55, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.0},
             ]
         }
     },
@@ -214,7 +214,7 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.55},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.18, "Alpha2": 0.18},
-                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.75, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.1,  "Alpha2": 0.0},
             ]
         }
     },
@@ -232,7 +232,7 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.95},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.65},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.28, "Alpha2": 0.28},
-                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.70, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.0,  "Alpha2": 0.0},
             ]
         }
     },
@@ -250,7 +250,7 @@ MODES = {
                 {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 1.0},
                 {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.8},
                 {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.38, "Alpha2": 0.38},
-                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.90, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 1.25, "Alpha2": 0.0},
             ]
         }
     },
@@ -262,11 +262,6 @@ DEFAULT_MODE = "natural"  # режим по умолчанию
 _user_mode: dict = {}  # uid → mode_key
 
 # Флаг активной акции — устанавливается через /promo
-# ══ РЕЖИМ ОБСЛУЖИВАНИЯ ══════════════════════════════════════════════════════
-# Поставь True чтобы новые пользователи видели уведомление о неполадках
-MAINTENANCE_MODE = False
-# ═════════════════════════════════════════════════════════════════════════════
-
 # promo_active_until = None или datetime когда акция заканчивается
 _promo_until: float = 0.0  # unix timestamp конца акции
 _PROMO_FILE = Path(__file__).parent / ".promo_until"
@@ -276,14 +271,7 @@ def _load_promo():
     global _promo_until
     try:
         if _PROMO_FILE.exists():
-            val = float(_PROMO_FILE.read_text().strip())
-            import time as _t
-            if val > _t.time():
-                _promo_until = val
-            else:
-                _promo_until = 0.0
-        else:
-            _promo_until = 0.0
+            _promo_until = float(_PROMO_FILE.read_text().strip())
     except Exception:
         _promo_until = 0.0
 
@@ -546,7 +534,7 @@ BACK_TEXTS = {
 PROMO_BTN_TEXTS = {
     "ru": "🔥 Акция — 799 руб",
     "ky": "🔥 Акция — 799 сом",
-    "kk": "🔥 Акция — 5,200 теңге",
+    "kk": "🔥 Акция — 4,500 теңге",
     "en": "🔥 Happy Hours — $9 USDT",
     "vi": "🔥 Giờ Vàng — 250,000 VND",
 }
@@ -630,8 +618,6 @@ async def cmd_start(message: Message, state: FSMContext):
     )
     # Определяем язык — если уже выбран вручную, не меняем
     lang = await get_user_language(message.from_user.id)
-
-    # Технический режим отключён — MAINTENANCE_MODE = False
     if not lang or lang == "ru":
         # Для новых пользователей — определяем по Telegram language_code
         tg_lang = (message.from_user.language_code or "").lower()
@@ -750,11 +736,11 @@ async def menu_promo_start(message: Message, state: FSMContext):
     from texts import TEXTS as _TPS
     # Кнопка на языке пользователя
     promo_btn_labels = {
-        "ru": "🎉 Купить за 799 руб",
-        "ky": "🎉 799 сомго сатып ал",
-        "kk": "🎉 5,200 теңгеге сатып алу",
-        "en": "🎉 Buy for $10 USDT",
-        "vi": "🎉 Mua với giá 270,000 VND",
+        "ru": "🔥 Купить за 799 руб",
+        "ky": "🔥 799 сомго сатып ал",
+        "kk": "🔥 4,500 теңгеге сатып алу",
+        "en": "🔥 Buy for $9 USDT",
+        "vi": "🔥 Mua với giá 250,000 VND",
     }
     _ps_btn = promo_btn_labels.get(_pslang, "🔥 Купить")
     promo_buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
@@ -788,9 +774,6 @@ async def menu_language(message: Message, state: FSMContext):
 
 @dp.message(F.text.in_({'⬅️ Назад', '⬅️ Back', '⬅️ Quay lại', '⬅️ Артка', '⬅️ Артқа', '⬅️ Башкы меню', '⬅️ Басты мәзір', '⬅️ Menu chính', '⬅️ Главное меню', '⬅️ Main menu'}))
 async def back(message: Message, state: FSMContext):
-    uid = message.from_user.id
-    current = await state.get_state()
-    logger.info("[HANDLER] back uid=%d state=%s text=%r", uid, current, message.text)
     await state.clear()
     uid = message.from_user.id
     user_lang = await get_user_language(uid)
@@ -1959,7 +1942,7 @@ async def cmd_promo(message: Message, state: FSMContext):
             "<b>С А А Т Т А Р</b>\n"
             "🔥 ——————————————— 🔥\n\n"
             "<i>Бүгүн гана — 1 айлык жазылуу</i>\n\n"
-            "💎 <b>799 сом</b>  <s>999 сом</s>\n\n"
+            "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
             "✦ Чексиз AI ретуши\n"
             "✦ Оригинал сапат 4K / 24MP\n"
             "✦ 5 иштетүү режими\n\n"
@@ -1967,10 +1950,10 @@ async def cmd_promo(message: Message, state: FSMContext):
         ),
         "kk": (
             "🔥 ——————————————— 🔥\n"
-            "<b>БОТ ҚАЛПЫНА КЕЛДІ!</b>\n"
-            "🎉 ——————————————— 🎉\n\n"
-            "<i>Жаңарту аяқталуына орай — арнайы ұсыныс!</i>\n\n"
-            "💎 <b>5,200 теңге</b>  <s>5,999 теңге</s>\n\n"
+            "<b>Б А Қ Ы Т Т Ы   С А Ғ А Т Т А Р</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Бүгін ғана — 1 айлық жазылым</i>\n\n"
+            "💎 <b>4,500 теңге</b>  <s>5,999 теңге</s>\n\n"
             "✦ Шексіз AI ретушь\n"
             "✦ Бастапқы сапат 4K / 24MP\n"
             "✦ 5 өңдеу режимі\n\n"
@@ -1978,10 +1961,10 @@ async def cmd_promo(message: Message, state: FSMContext):
         ),
         "en": (
             "🔥 ——————————————— 🔥\n"
-            "<b>B O T   I S   B A C K!</b>\n"
-            "🎉 ——————————————— 🎉\n\n"
-            "<i>Special offer to celebrate our update!</i>\n\n"
-            "💎 <b>$10 USDT</b>  <s>$12</s>\n\n"
+            "<b>H A P P Y   H O U R S</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Today only — 1 month subscription</i>\n\n"
+            "💎 <b>$9 USDT</b>  <s>$12</s>\n\n"
             "✦ Unlimited AI retouching\n"
             "✦ Original quality 4K / 24MP\n"
             "✦ 5 processing modes\n\n"
@@ -1989,10 +1972,10 @@ async def cmd_promo(message: Message, state: FSMContext):
         ),
         "vi": (
             "🔥 ——————————————— 🔥\n"
-            "<b>BOT ĐÃ TRỞ LẠI!</b>\n"
-            "🎉 ——————————————— 🎉\n\n"
-            "<i>Ưu đãi đặc biệt nhân dịp cập nhật!</i>\n\n"
-            "💎 <b>270,000 VND</b>  <s>299,000 VND</s>\n\n"
+            "<b>G I Ờ   V À N G</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Chỉ hôm nay — đăng ký 1 tháng</i>\n\n"
+            "💎 <b>250,000 VND</b>  <s>299,000 VND</s>\n\n"
             "✦ Retouch AI không giới hạn\n"
             "✦ Chất lượng gốc 4K / 24MP\n"
             "✦ 5 chế độ xử lý\n\n"
@@ -2069,9 +2052,9 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
     PROMO_TEXTS_SEND = {
         "ru": (
             "🔥 ——————————————— 🔥\n"
-            "<b>Б О Т   В О С С Т А Н О В Л Е Н!</b>\n"
-            "🎉 ——————————————— 🎉\n\n"
-            "<i>В честь обновления — специальное предложение!</i>\n\n"
+            "<b>С Ч А С Т Л И В Ы Е   Ч А С Ы</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Только сегодня — подписка на 1 месяц</i>\n\n"
             "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
             "✦ Неограниченная AI-ретушь\n"
             "✦ Оригинальное разрешение 4K / 24MP\n"
@@ -2080,10 +2063,10 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
         ),
         "ky": (
             "🔥 ——————————————— 🔥\n"
-            "<b>БОТ КАЙРА ИШТЕЙТ!</b>\n"
-            "🎉 ——————————————— 🎉\n\n"
-            "<i>Жаңыртуу урматына — атайын сунуш!</i>\n\n"
-            "💎 <b>799 сом</b>  <s>999 сом</s>\n\n"
+            "<b>Б А К Ы Т Т У У   С А А Т Т А Р</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Бүгүн гана — 1 айлык жазылуу</i>\n\n"
+            "💎 <b>799 руб</b>  <s>999 руб</s>\n\n"
             "✦ Чексиз AI ретуши\n"
             "✦ Оригинал сапат 4K / 24MP\n"
             "✦ 5 иштетүү режими\n\n"
@@ -2091,10 +2074,10 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
         ),
         "kk": (
             "🔥 ——————————————— 🔥\n"
-            "<b>БОТ ҚАЛПЫНА КЕЛДІ!</b>\n"
-            "🎉 ——————————————— 🎉\n\n"
-            "<i>Жаңарту аяқталуына орай — арнайы ұсыныс!</i>\n\n"
-            "💎 <b>5,200 теңге</b>  <s>5,999 теңге</s>\n\n"
+            "<b>Б А Қ Ы Т Т Ы   С А Ғ А Т Т А Р</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Бүгін ғана — 1 айлық жазылым</i>\n\n"
+            "💎 <b>4,500 теңге</b>  <s>5,999 теңге</s>\n\n"
             "✦ Шексіз AI ретушь\n"
             "✦ Бастапқы сапат 4K / 24MP\n"
             "✦ 5 өңдеу режимі\n\n"
@@ -2102,10 +2085,10 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
         ),
         "en": (
             "🔥 ——————————————— 🔥\n"
-            "<b>B O T   I S   B A C K!</b>\n"
-            "🎉 ——————————————— 🎉\n\n"
-            "<i>Special offer to celebrate our update!</i>\n\n"
-            "💎 <b>$10 USDT</b>  <s>$12</s>\n\n"
+            "<b>H A P P Y   H O U R S</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Today only — 1 month subscription</i>\n\n"
+            "💎 <b>$9 USDT</b>  <s>$12</s>\n\n"
             "✦ Unlimited AI retouching\n"
             "✦ Original quality 4K / 24MP\n"
             "✦ 5 processing modes\n\n"
@@ -2113,10 +2096,10 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
         ),
         "vi": (
             "🔥 ——————————————— 🔥\n"
-            "<b>BOT ĐÃ TRỞ LẠI!</b>\n"
-            "🎉 ——————————————— 🎉\n\n"
-            "<i>Ưu đãi đặc biệt nhân dịp cập nhật!</i>\n\n"
-            "💎 <b>270,000 VND</b>  <s>299,000 VND</s>\n\n"
+            "<b>G I Ờ   V À N G</b>\n"
+            "🔥 ——————————————— 🔥\n\n"
+            "<i>Chỉ hôm nay — đăng ký 1 tháng</i>\n\n"
+            "💎 <b>250,000 VND</b>  <s>299,000 VND</s>\n\n"
             "✦ Retouch AI không giới hạn\n"
             "✦ Chất lượng gốc 4K / 24MP\n"
             "✦ 5 chế độ xử lý\n\n"
@@ -2126,11 +2109,11 @@ async def promo_send_confirmed(callback: CallbackQuery, state: FSMContext):
 
     # Кнопки на языке пользователя
     PROMO_BTN_LABELS = {
-        "ru": "🎉 Купить за 799 руб",
-        "ky": "🎉 799 сомго сатып ал",
-        "kk": "🎉 5,200 теңгеге сатып алу",
-        "en": "🎉 Buy for $10 USDT",
-        "vi": "🎉 Mua với giá 270,000 VND",
+        "ru": "🔥 Купить за 799 руб",
+        "ky": "🔥 799 сомго сатып ал",
+        "kk": "🔥 4,500 теңгеге сатып алу",
+        "en": "🔥 Buy for $9 USDT",
+        "vi": "🔥 Mua với giá 250,000 VND",
     }
 
     status_msg = await callback.message.answer(
@@ -2276,197 +2259,6 @@ async def callback_set_language(callback: CallbackQuery):
     )
 
 
-
-
-@dp.message(Command("notify"))
-async def cmd_notify(message: Message):
-    """Рассылка технического уведомления ВСЕМ пользователям. Только админ."""
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    all_users = await get_all_users()
-    total = len(all_users)
-
-    # Превью текста рассылки
-    preview_text_ru = (
-        "✅ <b>Retouch Lab снова работает!</b>\n\n"
-        "Мы провели техническое обновление\n"
-        "Улучшена стабильность и скорость обработки\n\n"
-        "Приносим извинения за доставленные неудобства\n\n"
-        "Спасибо за ваше терпение 🙏\n\n"
-        "📸 <b>Отправьте фотографию для обработки!</b>\n\n"
-        "<i>(не-подписчики также увидят акцию 799)</i>"
-    )
-
-    preview_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Отправить всем", callback_data="notify_confirm")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="notify_cancel")],
-    ])
-    await message.answer(
-        f"📢 <b>Рассылка восстановления</b>\n\n"
-        f"Получателей: <b>{total}</b>\n"
-        f"💎 Подписчики: только текст + фото\n"
-        f"🆓 Без подписки: текст + акция 799 + кнопка\n\n"
-        f"Превью (RU):\n{preview_text_ru}\n\n"
-        f"Отправить?",
-        reply_markup=preview_kb,
-        parse_mode="HTML",
-    )
-
-
-@dp.callback_query(F.data == "notify_confirm")
-async def notify_confirmed(callback: CallbackQuery):
-    """Рассылка: подписчики → призыв отправить фото, остальные → акция 799."""
-    if callback.from_user.id != ADMIN_ID:
-        return
-    await callback.answer()
-
-    # Тексты восстановления — для ВСЕХ
-    RESTORE_TEXTS = {
-        "ru": (
-            "✅ <b>Retouch Lab снова работает!</b>\n\n"
-            "Мы провели техническое обновление\n"
-            "Улучшена стабильность и скорость обработки\n\n"
-            "Приносим извинения за доставленные неудобства\n\nСпасибо за ваше терпение 🙏"
-        ),
-        "ky": (
-            "✅ <b>Retouch Lab кайра иштейт!</b>\n\n"
-            "Биз техникалык жаңыртуу жүргүздүк\n"
-            "Туруктуулук жана иштетүү ылдамдыгы жакшыртылды\n\n"
-            "Ыңгайсыздык үчүн кечирим сурайбыз\n\nЧыдамдуулугуңуз үчүн рахмат 🙏"
-        ),
-        "kk": (
-            "✅ <b>Retouch Lab қайта жұмыс істеп тұр!</b>\n\n"
-            "Біз техникалық жаңарту жүргіздік\n"
-            "Тұрақтылық пен өңдеу жылдамдығы жақсартылды\n\n"
-            "Ыңғайсыздық үшін кешіріңіз\n\nШыдамдылығыңыз үшін рахмет 🙏"
-        ),
-        "en": (
-            "✅ <b>Retouch Lab is back!</b>\n\n"
-            "We completed a technical update\n"
-            "Stability and processing speed improved\n\n"
-            "We apologize for any inconvenience caused\n\nThank you for your patience 🙏"
-        ),
-        "vi": (
-            "✅ <b>Retouch Lab đã hoạt động trở lại!</b>\n\n"
-            "Chúng tôi đã hoàn thành cập nhật kỹ thuật\n"
-            "Độ ổn định và tốc độ xử lý được cải thiện\n\n"
-            "Chúng tôi xin lỗi vì sự bất tiện đã gây ra\n\nCảm ơn sự kiên nhẫn của bạn 🙏"
-        ),
-    }
-
-    # Призыв отправить фото — для подписчиков
-    SEND_PHOTO_TEXTS = {
-        "ru": "\n\n📸 <b>Отправьте фотографию для обработки!</b>",
-        "ky": "\n\n📸 <b>Иштетүү үчүн сүрөт жибериңиз!</b>",
-        "kk": "\n\n📸 <b>Өңдеу үшін фото жіберіңіз!</b>",
-        "en": "\n\n📸 <b>Send a photo for retouching!</b>",
-        "vi": "\n\n📸 <b>Gửi ảnh để retouch!</b>",
-    }
-
-    # Тексты акции — для тех кто БЕЗ подписки
-    PROMO_799_TEXTS = {
-        "ru": (
-            "\n\n🔥 <b>Счастливые часы</b>\n"
-            "<i>В честь восстановления — специальное предложение!</i>\n\n"
-            "💎 1 месяц за <b>799 руб</b> вместо 999 руб\n\n"
-            "✦ Неограниченная AI-ретушь\n"
-            "✦ 5 режимов · 4K / 24MP"
-        ),
-        "ky": (
-            "\n\n🔥 <b>Бактуу саттар</b>\n"
-            "<i>Калыбына келтирүү урматына — атайын сунуш!</i>\n\n"
-            "💎 1 ай — <b>799 сом</b> (999 сом ордуна)\n\n"
-            "✦ Чексиз AI ретуши\n"
-            "✦ 5 режим · 4K / 24MP"
-        ),
-        "kk": (
-            "\n\n🔥 <b>Бақытты сағаттар</b>\n"
-            "<i>Қалпына келтіру құрметіне — арнайы ұсыныс!</i>\n\n"
-            "💎 1 ай — <b>5,200 теңге</b> (5,999 орнына)\n\n"
-            "✦ Шексіз AI ретушь\n"
-            "✦ 5 режим · 4K / 24MP"
-        ),
-        "en": (
-            "\n\n🔥 <b>Happy Hours</b>\n"
-            "<i>Special offer to celebrate our recovery!</i>\n\n"
-            "💎 1 month for <b>$10 USDT</b> instead of $12\n\n"
-            "✦ Unlimited AI retouching\n"
-            "✦ 5 modes · 4K / 24MP"
-        ),
-        "vi": (
-            "\n\n🔥 <b>Giờ Vàng</b>\n"
-            "<i>Ưu đãi đặc biệt nhân dịp khôi phục!</i>\n\n"
-            "💎 1 tháng — <b>270,000 VND</b> thay vì 299,000\n\n"
-            "✦ Retouch AI không giới hạn\n"
-            "✦ 5 chế độ · 4K / 24MP"
-        ),
-    }
-
-    BUY_BTN_TEXTS = {
-        "ru": "🔥 Купить за 799 руб",
-        "ky": "🔥 799 сомго сатып ал",
-        "kk": "🔥 5,200 теңгеге сатып алу",
-        "en": "🔥 Buy for $10 USDT",
-        "vi": "🔥 Mua với giá 270,000 VND",
-    }
-
-    all_users = await get_all_users()
-    sent_sub = sent_no_sub = blocked = errors = 0
-    from aiogram.exceptions import TelegramForbiddenError
-
-    for user in all_users:
-        uid = user["telegram_id"]
-        lang = await get_user_language(uid)
-        has_sub = bool(await check_active_subscription(uid))
-
-        # Базовый текст — для ВСЕХ одинаковый
-        base_text = RESTORE_TEXTS.get(lang, RESTORE_TEXTS["ru"])
-        # Призыв отправить фото — для ВСЕХ
-        photo_call = SEND_PHOTO_TEXTS.get(lang, SEND_PHOTO_TEXTS["ru"])
-
-        try:
-            if has_sub:
-                # Подписчик — восстановление + призыв отправить фото (без акции)
-                text = base_text + photo_call
-                await bot.send_message(chat_id=uid, text=text, parse_mode="HTML")
-                sent_sub += 1
-            else:
-                # Без подписки — восстановление + акция + кнопка + призыв фото
-                text = base_text + PROMO_799_TEXTS.get(lang, PROMO_799_TEXTS["ru"]) + photo_call
-                buy_kb = InlineKeyboardMarkup(inline_keyboard=[[
-                    InlineKeyboardButton(
-                        text=BUY_BTN_TEXTS.get(lang, BUY_BTN_TEXTS["ru"]),
-                        callback_data="buy_promo_1m"
-                    )
-                ]])
-                await bot.send_message(
-                    chat_id=uid, text=text,
-                    reply_markup=buy_kb, parse_mode="HTML"
-                )
-                sent_no_sub += 1
-        except TelegramForbiddenError:
-            blocked += 1
-        except Exception:
-            errors += 1
-
-    total = sent_sub + sent_no_sub + blocked + errors
-    await callback.message.answer(
-        f"✅ <b>Рассылка завершена!</b>\n\n"
-        f"👥 Всего: {total}\n"
-        f"💎 Подписчики (фото): {sent_sub}\n"
-        f"🆓 Без подписки (акция): {sent_no_sub}\n"
-        f"🚫 Заблокировали: {blocked}\n"
-        f"❌ Ошибки: {errors}",
-        parse_mode="HTML",
-    )
-
-
-@dp.callback_query(F.data == "notify_cancel")
-async def notify_cancelled(callback: CallbackQuery):
-    await callback.answer()
-    await callback.message.edit_text("❌ Рассылка отменена.")
-
 @dp.message(Command("relaunch"))
 async def cmd_relaunch(message: Message):
     """Отправляет сообщение о возвращении бота всем пользователям."""
@@ -2513,18 +2305,6 @@ async def cmd_cancel_broadcast(message: Message, state: FSMContext):
         return
     await state.clear()
     await message.answer("❌ Рассылка отменена")
-
-
-@dp.message(Command("cancel"))
-async def cmd_cancel_any(message: Message, state: FSMContext):
-    """Универсальный /cancel — сбрасывает любое состояние."""
-    current = await state.get_state()
-    await state.clear()
-    if current:
-        logger.info("[CANCEL] uid=%d state=%s cleared", message.from_user.id, current)
-        await message.answer("❌ Действие отменено")
-    else:
-        await message.answer("Нет активного действия для отмены")
 
 
 @dp.message(BroadcastStates.waiting_text)
@@ -2635,7 +2415,7 @@ async def main():
     scheduler.start()
     logger.info("Scheduler started — daily notifications at 10:00")
 
-    await dp.start_polling(bot, drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":

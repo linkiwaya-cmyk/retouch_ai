@@ -8,7 +8,7 @@ import logging
 import random
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError
-from database import get_inactive_users, mark_reminder_sent, mark_user_inactive
+from database import get_inactive_users, mark_reminder_sent
 
 logger = logging.getLogger(__name__)
 
