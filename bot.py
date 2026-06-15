@@ -2576,10 +2576,36 @@ async def confirm_update_broadcast(callback: CallbackQuery, state: FSMContext):
     sent = 0
     failed = 0
 
+    # Пути к фото до/после на сервере
+    import os as _os
+    BASE_DIR = _os.path.dirname(_os.path.abspath(__file__))
+    before_path = _os.path.join(BASE_DIR, "update_before.png")
+    after_path  = _os.path.join(BASE_DIR, "update_after.png")
+    has_photos  = _os.path.exists(before_path) and _os.path.exists(after_path)
+
     await callback.message.edit_text(f"📢 Отправляю обновление {total} пользователям...")
 
+    from aiogram.types import FSInputFile, InputMediaPhoto
     for uid in users:
         try:
+            if has_photos:
+                # Отправляем альбом из двух фото с подписями
+                media = [
+                    InputMediaPhoto(
+                        media=FSInputFile(before_path),
+                        caption="📸 <b>Было</b> — раньше фото теряло контраст и сочность",
+                        parse_mode="HTML",
+                    ),
+                    InputMediaPhoto(
+                        media=FSInputFile(after_path),
+                        caption="✨ <b>Стало</b> — теперь фото сохраняет живой цвет и текстуру",
+                        parse_mode="HTML",
+                    ),
+                ]
+                await bot.send_media_group(uid, media=media)
+                await asyncio.sleep(0.1)
+
+            # Потом текст с обновлением
             await bot.send_message(uid, UPDATE_TEXT, parse_mode="HTML")
             sent += 1
             await asyncio.sleep(0.05)
@@ -2592,6 +2618,7 @@ async def confirm_update_broadcast(callback: CallbackQuery, state: FSMContext):
         f"Ошибок: {failed}"
     )
     await callback.answer()
+
 
 
 @dp.callback_query(lambda c: c.data == "cancel_update_broadcast")
