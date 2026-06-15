@@ -1,6 +1,6 @@
 import requests, json, time, io, os
 from dotenv import load_dotenv
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageEnhance
 import pillow_heif
 
 load_dotenv()
@@ -9,23 +9,17 @@ RETOUCH_TOKEN = os.getenv("RETOUCH4ME_TOKEN")
 BASE_URL = "https://cf-retoucher.retouch4.me/api/v1"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ПРАВИЛО: бот делает ТОЛЬКО ретушь лица и кожи.
-# Фотография после обработки должна выглядеть как исходник —
-# тот же контраст, цвет, экспозиция, тон, насыщенность, фон, волосы, тело.
-# Разница только в более чистой коже лица.
+# ПРИНЦИП: "Retouch the face, not the photo"
 #
-# ЗАПРЕЩЕНО:
-# - менять контраст, цвет, насыщенность, экспозицию фото
-# - любые PIL постобработки цвета/яркости/контраста
-# - sharpening (он меняет восприятие всего кадра)
-# - Dodge Burn с Alpha > 0.3 (агрессивно меняет светотень лица)
-# - Skin Tone Alpha2 (глобальный цветовой сдвиг)
+# Retouch4me API при обработке кожи слегка снижает контраст и насыщенность.
+# Чтобы компенсировать это, после API применяем минимальное восстановление:
+#   - Contrast 1.08  — возвращает глубину чёрного и объём
+#   - Saturation 1.10 — возвращает сочность и тепло цвета
 #
-# РАЗРЕШЕНО:
-# - Heal (убирает дефекты кожи — прыщи, пятна)
-# - Fabric (текстура кожи, только мягко Alpha <= 0.25)
-# - Eye Vessels (убирает красноту глаз)
-# - Dodge Burn Alpha1 только очень мягко (локальная светотень лица)
+# Эти значения подобраны чтобы результат был чуть живее исходника,
+# не ярче и не холоднее.
+#
+# ЗАПРЕЩЕНО добавлять: sharpening, brightness, color balance, warmth.
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Дефолтный пресет — используется если preset=None
@@ -106,7 +100,12 @@ def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> byt
     if result_img.size != original_size:
         result_img = result_img.resize(original_size, Image.LANCZOS)
 
-    # Никакой постобработки — возвращаем как есть
+    # Восстанавливаем контраст и насыщенность которые API слегка съедает.
+    # Contrast 1.08 — возвращает глубину и объём (1.0 = без изменений)
+    # Saturation 1.10 — возвращает сочность и тепло цвета
+    result_img = ImageEnhance.Contrast(result_img).enhance(1.08)
+    result_img = ImageEnhance.Color(result_img).enhance(1.10)
+
     return _save_jpeg(result_img, quality=100)
 
 
