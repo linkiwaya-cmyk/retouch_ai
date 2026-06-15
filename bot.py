@@ -2515,12 +2515,11 @@ async def cmd_broadcast_update(message: Message, state: FSMContext):
     """
     Рассылка об обновлении алгоритма ретуши.
     Только для администратора. Команда: /broadcast_update
-    Показывает preview и просит подтверждение перед отправкой.
+    Показывает preview с фото до/после и просит подтверждение.
     """
     if message.from_user.id != ADMIN_ID:
         return
 
-    # Сбрасываем любое активное состояние
     await state.clear()
 
     UPDATE_TEXT = (
@@ -2540,11 +2539,33 @@ async def cmd_broadcast_update(message: Message, state: FSMContext):
     users = await get_all_users()
     total = len(users)
 
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    import os as _os
+    BASE_DIR = _os.path.dirname(_os.path.abspath(__file__))
+    before_path = _os.path.join(BASE_DIR, "update_before.png")
+    after_path  = _os.path.join(BASE_DIR, "update_after.png")
+    has_photos  = _os.path.exists(before_path) and _os.path.exists(after_path)
+
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, InputMediaPhoto
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="✅ Отправить всем", callback_data="confirm_update_broadcast"),
         InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_update_broadcast"),
     ]])
+
+    # Показываем фото до/после в preview
+    if has_photos:
+        media = [
+            InputMediaPhoto(
+                media=FSInputFile(before_path),
+                caption="📸 <b>Было</b> — раньше фото теряло контраст и сочность",
+                parse_mode="HTML",
+            ),
+            InputMediaPhoto(
+                media=FSInputFile(after_path),
+                caption="✨ <b>Стало</b> — теперь фото сохраняет живой цвет и текстуру",
+                parse_mode="HTML",
+            ),
+        ]
+        await message.answer_media_group(media=media)
 
     await message.answer(
         f"👁 <b>Preview сообщения:</b>\n"
@@ -2557,7 +2578,6 @@ async def cmd_broadcast_update(message: Message, state: FSMContext):
         reply_markup=keyboard,
     )
 
-    # Сохраняем текст в state чтобы использовать при подтверждении
     await state.update_data(update_broadcast_text=UPDATE_TEXT)
 
 
