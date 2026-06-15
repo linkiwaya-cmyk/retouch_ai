@@ -170,90 +170,100 @@ ADMIN_ID       = int(os.getenv("ADMIN_CHAT_ID", "532189427"))
 MODES = {
     # ══════════════════════════════════════════════════════════════
     # ПРИНЦИП: "Retouch the face, not the photo"
-    # Сохранять: контраст, насыщенность, цвет, текстуру, веснушки,
-    # родинки, индивидуальные особенности лица.
-    # Разрешено: убрать прыщи, временные несовершенства, покраснения.
-    # Запрещено: размывать кожу, убирать веснушки, менять контраст.
-    # Fabric убран или минимален — он съедает веснушки и текстуру.
-    # Dodge Burn Alpha1 не выше 0.25 — не меняем светотень фото.
-    # Alpha2 всегда 0.0 — не трогаем глобальный тон.
+    # 5 режимов с чёткой градацией от минимального до журнального.
+    # Веснушки, родинки и текстура кожи сохраняются во всех режимах.
+    # Fabric отвечает за сглаживание кожи — держим минимальным.
+    # Dodge Burn — объём и светотень лица (не цвет, не контраст фото).
+    # Portrait Volumes — скульптурирование лица (хайлайтер/тени).
     # ══════════════════════════════════════════════════════════════
+
     "clean": {
         "name": "✨ Чистая кожа",
         "desc": (
-            "Минимальная обработка. Убирает прыщи и дефекты.\n"
-            "Максимально натуральный результат — текстура и родинки сохраняются."
+            "Минимальная обработка. Убирает только прыщи и дефекты.\n"
+            "Текстура, веснушки и родинки сохраняются полностью."
         ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.6},
+                # Только убираем дефекты — больше ничего не трогаем
+                {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.65},
                 {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.4},
             ]
         }
     },
+
     "natural": {
         "name": "🌿 Натуральная ретушь",
         "desc": (
             "Основной режим для каждого дня.\n"
-            "Чистит кожу, сохраняет текстуру и поры, улучшает Dodge & Burn лица."
+            "Чистая кожа, лёгкое выравнивание, веснушки сохраняются."
         ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.55},
+                {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.60},
+                {"Plugin": "Fabric",      "Scale": 0, "Alpha1": 0.10},
                 {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.5},
-                {"Plugin": "Dodge Burn",  "Scale": 1, "Alpha1": 0.20, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",  "Scale": 1, "Alpha1": 0.22, "Alpha2": 0.0},
             ]
         }
     },
+
     "depth": {
         "name": "💫 Объём и свет",
         "desc": (
             "Добавляет объём и глубину лицу.\n"
-            "Усиливает Dodge & Burn — профессиональный портретный вид."
+            "Профессиональный Dodge & Burn — лицо выглядит скульптурно."
         ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",           "Scale": 0, "Alpha1": 0.50},
-                {"Plugin": "Eye Vessels",    "Scale": 0, "Alpha1": 0.5},
-                {"Plugin": "Eye Brilliance", "Scale": 0, "Alpha1": 0.25},
-                {"Plugin": "Dodge Burn",     "Scale": 1, "Alpha1": 0.25, "Alpha2": 0.0},
+                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.60},
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.14},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.55},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.28},
+                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.38, "Alpha2": 0.0},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.25},
             ]
         }
     },
+
     "beauty": {
         "name": "💄 Beauty Pro",
         "desc": (
-            "Качественная beauty-ретушь для Instagram и соцсетей.\n"
-            "Чистая кожа, выразительные глаза — без пластика и изменения цвета."
+            "Beauty-ретушь для Instagram и соцсетей.\n"
+            "Чистая кожа, выразительные глаза, объём лица — без пластика."
         ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",           "Scale": 0, "Alpha1": 0.55},
-                {"Plugin": "Fabric",         "Scale": 0, "Alpha1": 0.08},
-                {"Plugin": "Eye Vessels",    "Scale": 0, "Alpha1": 0.6},
-                {"Plugin": "Eye Brilliance", "Scale": 0, "Alpha1": 0.30},
-                {"Plugin": "Dodge Burn",     "Scale": 1, "Alpha1": 0.25, "Alpha2": 0.0},
+                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.65},
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.18},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.65},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.40},
+                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.48, "Alpha2": 0.0},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.38},
             ]
         }
     },
+
     "magazine": {
         "name": "🌟 Журнальный стиль",
         "desc": (
             "Премиальный editorial-режим.\n"
-            "Максимально чистая кожа, выраженный объём — magazine look."
+            "Максимальный объём, скульптурное лицо, хайлайтер — magazine look."
         ),
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",           "Scale": 0, "Alpha1": 0.60},
-                {"Plugin": "Fabric",         "Scale": 0, "Alpha1": 0.10},
-                {"Plugin": "Eye Vessels",    "Scale": 0, "Alpha1": 0.7},
-                {"Plugin": "Eye Brilliance", "Scale": 0, "Alpha1": 0.40},
-                {"Plugin": "Dodge Burn",     "Scale": 1, "Alpha1": 0.25, "Alpha2": 0.0},
+                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.70},
+                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.22},
+                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.75},
+                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.55},
+                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.22, "Alpha2": 0.0},
+                {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.60, "Alpha2": 0.0},
+                {"Plugin": "Portrait Volumes", "Scale": 0, "Alpha1": 0.55},
             ]
         }
     },
