@@ -168,13 +168,16 @@ ADMIN_ID       = int(os.getenv("ADMIN_CHAT_ID", "532189427"))
 # ══════════════════════════════════════════════════════════════════════════════
 
 MODES = {
-    # ПРАВИЛО для всех пресетов:
-    # - Dodge Burn Alpha2 всегда 0.0 (не трогаем глобальный тон)
-    # - Dodge Burn Alpha1 не выше 0.35 (только локальная светотень лица)
-    # - Fabric не выше 0.30 (сохраняем текстуру кожи)
-    # - White Teeth Alpha2 = 0.0 (не белим, только убираем желтизну)
-    # - Eye Brilliance мягко (не меняем цвет глаз)
-    # Цель: фото после ретуши = исходник, только кожа лица чище
+    # ══════════════════════════════════════════════════════════════
+    # ПРИНЦИП: "Retouch the face, not the photo"
+    # Сохранять: контраст, насыщенность, цвет, текстуру, веснушки,
+    # родинки, индивидуальные особенности лица.
+    # Разрешено: убрать прыщи, временные несовершенства, покраснения.
+    # Запрещено: размывать кожу, убирать веснушки, менять контраст.
+    # Fabric убран или минимален — он съедает веснушки и текстуру.
+    # Dodge Burn Alpha1 не выше 0.25 — не меняем светотень фото.
+    # Alpha2 всегда 0.0 — не трогаем глобальный тон.
+    # ══════════════════════════════════════════════════════════════
     "clean": {
         "name": "✨ Чистая кожа",
         "desc": (
@@ -184,10 +187,8 @@ MODES = {
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.5},
-                {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.5},
-                {"Plugin": "Fabric",      "Scale": 0, "Alpha1": 0.12},
-                {"Plugin": "Dodge Burn",  "Scale": 1, "Alpha1": 0.15, "Alpha2": 0.0},
+                {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.6},
+                {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.4},
             ]
         }
     },
@@ -200,11 +201,9 @@ MODES = {
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.45},
-                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.20},
-                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.6},
-                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.25},
-                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.25, "Alpha2": 0.0},
+                {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.55},
+                {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.5},
+                {"Plugin": "Dodge Burn",  "Scale": 1, "Alpha1": 0.20, "Alpha2": 0.0},
             ]
         }
     },
@@ -217,11 +216,10 @@ MODES = {
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.45},
-                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.22},
-                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.6},
-                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
-                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.35, "Alpha2": 0.0},
+                {"Plugin": "Heal",           "Scale": 0, "Alpha1": 0.50},
+                {"Plugin": "Eye Vessels",    "Scale": 0, "Alpha1": 0.5},
+                {"Plugin": "Eye Brilliance", "Scale": 0, "Alpha1": 0.25},
+                {"Plugin": "Dodge Burn",     "Scale": 1, "Alpha1": 0.25, "Alpha2": 0.0},
             ]
         }
     },
@@ -234,12 +232,11 @@ MODES = {
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.5},
-                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.28},
-                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.7},
-                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.40},
-                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.20, "Alpha2": 0.0},
-                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.30, "Alpha2": 0.0},
+                {"Plugin": "Heal",           "Scale": 0, "Alpha1": 0.55},
+                {"Plugin": "Fabric",         "Scale": 0, "Alpha1": 0.08},
+                {"Plugin": "Eye Vessels",    "Scale": 0, "Alpha1": 0.6},
+                {"Plugin": "Eye Brilliance", "Scale": 0, "Alpha1": 0.30},
+                {"Plugin": "Dodge Burn",     "Scale": 1, "Alpha1": 0.25, "Alpha2": 0.0},
             ]
         }
     },
@@ -252,12 +249,11 @@ MODES = {
         "preset": {
             "mode": "professional",
             "tasks": [
-                {"Plugin": "Heal",             "Scale": 0, "Alpha1": 0.55},
-                {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.30},
-                {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
-                {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.50},
-                {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.25, "Alpha2": 0.0},
-                {"Plugin": "Dodge Burn",       "Scale": 1, "Alpha1": 0.35, "Alpha2": 0.0},
+                {"Plugin": "Heal",           "Scale": 0, "Alpha1": 0.60},
+                {"Plugin": "Fabric",         "Scale": 0, "Alpha1": 0.10},
+                {"Plugin": "Eye Vessels",    "Scale": 0, "Alpha1": 0.7},
+                {"Plugin": "Eye Brilliance", "Scale": 0, "Alpha1": 0.40},
+                {"Plugin": "Dodge Burn",     "Scale": 1, "Alpha1": 0.25, "Alpha2": 0.0},
             ]
         }
     },
@@ -2490,6 +2486,51 @@ async def cmd_relaunch(message: Message):
         f"✅ Доставлено: {stats['sent']}\n"
         f"🚫 Заблокировали: {stats['blocked']}",
         parse_mode="HTML",
+    )
+
+
+@dp.message(Command("broadcast_update"))
+async def cmd_broadcast_update(message: Message):
+    """
+    Рассылка об обновлении алгоритма ретуши.
+    Только для администратора. Команда: /broadcast_update
+    """
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    UPDATE_TEXT = (
+        "✨ <b>Обновление Retouch Lab</b>\n\n"
+        "Мы улучшили алгоритм обработки фотографий.\n\n"
+        "<b>Что изменилось:</b>\n"
+        "✅ фотографии больше не теряют контраст\n"
+        "✅ сохраняется естественная текстура кожи\n"
+        "✅ сохраняются веснушки и индивидуальные особенности\n"
+        "✅ сохраняется качество изображения\n"
+        "✅ ретушь стала более натуральной и аккуратной\n\n"
+        "Теперь результат выглядит максимально близко к оригиналу, "
+        "только с более чистой и ухоженной кожей.\n\n"
+        "Попробуйте обновлённую обработку прямо сейчас и сравните результат сами 📸✨"
+    )
+
+    users = await get_all_users()
+    total = len(users)
+    sent = 0
+    failed = 0
+
+    status_msg = await message.answer(f"📢 Начинаю рассылку обновления для {total} пользователей...")
+
+    for uid in users:
+        try:
+            await bot.send_message(uid, UPDATE_TEXT, parse_mode="HTML")
+            sent += 1
+            await asyncio.sleep(0.05)
+        except Exception:
+            failed += 1
+
+    await status_msg.edit_text(
+        f"✅ Рассылка обновления завершена\n"
+        f"Отправлено: {sent}\n"
+        f"Ошибок: {failed}"
     )
 
 
