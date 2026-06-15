@@ -2490,34 +2490,72 @@ async def cmd_relaunch(message: Message):
 
 
 @dp.message(Command("broadcast_update"))
-async def cmd_broadcast_update(message: Message):
+async def cmd_broadcast_update(message: Message, state: FSMContext):
     """
     Рассылка об обновлении алгоритма ретуши.
     Только для администратора. Команда: /broadcast_update
+    Показывает preview и просит подтверждение перед отправкой.
     """
     if message.from_user.id != ADMIN_ID:
         return
 
+    # Сбрасываем любое активное состояние
+    await state.clear()
+
     UPDATE_TEXT = (
-        "✨ <b>Обновление Retouch Lab</b>\n\n"
-        "Мы улучшили алгоритм обработки фотографий.\n\n"
+        "✨ <b>Retouch Lab стал лучше</b>\n\n"
+        "Мы переработали алгоритм ретуши — и теперь результат выглядит совершенно иначе.\n\n"
         "<b>Что изменилось:</b>\n"
-        "✅ фотографии больше не теряют контраст\n"
-        "✅ сохраняется естественная текстура кожи\n"
-        "✅ сохраняются веснушки и индивидуальные особенности\n"
-        "✅ сохраняется качество изображения\n"
-        "✅ ретушь стала более натуральной и аккуратной\n\n"
-        "Теперь результат выглядит максимально близко к оригиналу, "
-        "только с более чистой и ухоженной кожей.\n\n"
-        "Попробуйте обновлённую обработку прямо сейчас и сравните результат сами 📸✨"
+        "▸ фото сохраняет живой контраст и глубину\n"
+        "▸ цвет и насыщенность остаются как в оригинале\n"
+        "▸ веснушки, родинки и текстура кожи сохраняются\n"
+        "▸ ретушь стала точечной — только дефекты, без «пластика»\n"
+        "▸ результат выглядит как профессиональная обработка, а не фильтр\n\n"
+        "Раньше фото после обработки становилось плоским и холодным. "
+        "Теперь — живым, тёплым и естественным. Разница очевидна с первого взгляда.\n\n"
+        "Отправьте любое фото прямо сейчас и убедитесь сами 📸"
     )
+
+    users = await get_all_users()
+    total = len(users)
+
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Отправить всем", callback_data="confirm_update_broadcast"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_update_broadcast"),
+    ]])
+
+    await message.answer(
+        f"👁 <b>Preview сообщения:</b>\n"
+        f"{'─' * 30}\n\n"
+        f"{UPDATE_TEXT}\n\n"
+        f"{'─' * 30}\n"
+        f"📨 Будет отправлено: <b>{total}</b> пользователям\n\n"
+        f"Подтвердите отправку:",
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
+
+    # Сохраняем текст в state чтобы использовать при подтверждении
+    await state.update_data(update_broadcast_text=UPDATE_TEXT)
+
+
+@dp.callback_query(lambda c: c.data == "confirm_update_broadcast")
+async def confirm_update_broadcast(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Нет доступа")
+        return
+
+    data = await state.get_data()
+    UPDATE_TEXT = data.get("update_broadcast_text", "")
+    await state.clear()
 
     users = await get_all_users()
     total = len(users)
     sent = 0
     failed = 0
 
-    status_msg = await message.answer(f"📢 Начинаю рассылку обновления для {total} пользователей...")
+    await callback.message.edit_text(f"📢 Отправляю обновление {total} пользователям...")
 
     for uid in users:
         try:
@@ -2527,11 +2565,23 @@ async def cmd_broadcast_update(message: Message):
         except Exception:
             failed += 1
 
-    await status_msg.edit_text(
+    await callback.message.edit_text(
         f"✅ Рассылка обновления завершена\n"
         f"Отправлено: {sent}\n"
         f"Ошибок: {failed}"
     )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data == "cancel_update_broadcast")
+async def cancel_update_broadcast(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Нет доступа")
+        return
+    await state.clear()
+    await callback.message.edit_text("❌ Рассылка отменена")
+    await callback.answer()
+
 
 
 @dp.message(Command("broadcast"))
