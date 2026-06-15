@@ -1,6 +1,6 @@
 import requests, json, time, io, os
 from dotenv import load_dotenv
-from PIL import Image, ImageOps, ImageFilter
+from PIL import Image, ImageOps
 import pillow_heif
 
 load_dotenv()
@@ -9,38 +9,33 @@ RETOUCH_TOKEN = os.getenv("RETOUCH4ME_TOKEN")
 BASE_URL = "https://cf-retoucher.retouch4.me/api/v1"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# КОНЦЕПЦИЯ: локальная ретушь лица и кожи
+# ПРАВИЛО: бот делает ТОЛЬКО ретушь лица и кожи.
+# Фотография после обработки должна выглядеть как исходник —
+# тот же контраст, цвет, экспозиция, тон, насыщенность, фон, волосы, тело.
+# Разница только в более чистой коже лица.
 #
-# УБРАНО НАВСЕГДА:
-# - Skin Tone Alpha2 (глобальный цветовой сдвиг всего кадра)
-# - Dodge Burn Alpha2 / warmth (глобальный тёплый сдвиг)
-# - _add_warmth() (глобальная RGB коррекция)
-# - _fix_colors() (глобальная цветокоррекция)
-# - любые PIL-постобработки цвета
+# ЗАПРЕЩЕНО:
+# - менять контраст, цвет, насыщенность, экспозицию фото
+# - любые PIL постобработки цвета/яркости/контраста
+# - sharpening (он меняет восприятие всего кадра)
+# - Dodge Burn с Alpha > 0.3 (агрессивно меняет светотень лица)
+# - Skin Tone Alpha2 (глобальный цветовой сдвиг)
 #
-# ОСТАВЛЕНО:
-# - Fabric (текстура кожи)
-# - Eye Vessels / Eye Brilliance (глаза)
-# - White Teeth (зубы)
-# - Dodge Burn Alpha1 only (локальная светотень лица)
-# - Skin Tone Alpha1 only (тон кожи, не всего кадра)
-# - Portrait Volumes (объём лица)
-# - Heal (дефекты кожи)
-#
-# ДОБАВЛЕНО:
-# - Финальный Unsharp Mask после API — восстанавливает резкость
-#   без изменения цвета. Настройки мягкие, не добавляют артефактов.
+# РАЗРЕШЕНО:
+# - Heal (убирает дефекты кожи — прыщи, пятна)
+# - Fabric (текстура кожи, только мягко Alpha <= 0.25)
+# - Eye Vessels (убирает красноту глаз)
+# - Dodge Burn Alpha1 только очень мягко (локальная светотень лица)
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Дефолтный пресет — Natural Retouch
+# Дефолтный пресет — используется если preset=None
 PRESET = {
     "mode": "professional",
     "tasks": [
-        {"Plugin": "Fabric",           "Scale": 0, "Alpha1": 0.28},
-        {"Plugin": "Eye Vessels",      "Scale": 0, "Alpha1": 0.8},
-        {"Plugin": "Eye Brilliance",   "Scale": 0, "Alpha1": 0.35},
-        {"Plugin": "White Teeth",      "Scale": 0, "Alpha1": 0.2,  "Alpha2": 0.2},
-        {"Plugin": "Dodge Burn",       "Scale": 2, "Alpha1": 0.85, "Alpha2": 0.0},
+        {"Plugin": "Heal",        "Scale": 0, "Alpha1": 0.5},
+        {"Plugin": "Fabric",      "Scale": 0, "Alpha1": 0.20},
+        {"Plugin": "Eye Vessels", "Scale": 0, "Alpha1": 0.6},
+        {"Plugin": "Dodge Burn",  "Scale": 1, "Alpha1": 0.20, "Alpha2": 0.0},
     ]
 }
 
@@ -60,29 +55,15 @@ def _save_jpeg(img: Image.Image, quality: int = 100) -> bytes:
     return buf.getvalue()
 
 
-def _apply_sharpening(img: Image.Image) -> Image.Image:
-    """
-    Мягкий Unsharp Mask после ретуши API.
-    Восстанавливает резкость которую API слегка размывает.
-    
-    Параметры UnsharpMask(radius, percent, threshold):
-      radius=1.2   — радиус размытия (меньше = тоньше детали)
-      percent=60   — сила эффекта (60% = мягко, не агрессивно)
-      threshold=3  — порог: пиксели с разницей < 3 не трогаем
-                     (избегаем шумоусиления на гладкой коже)
-    """
-    return img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=60, threshold=3))
-
-
 def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> bytes:
     """
-    Отправляет оригинал в API без resize.
-    После получения результата — лёгкий sharpening для восстановления резкости.
+    Отправляет оригинал в API без resize и без постобработки.
+    Никаких изменений цвета, контраста, яркости после API.
+    Только ретушь лица через Retouch4me.
     """
     original_img = _open_image(image_bytes)
     original_size = original_img.size
 
-    # Отправляем оригинал напрямую — без resize
     api_bytes = _save_jpeg(original_img, quality=100)
     api_filename = filename.rsplit('.', 1)[0] + '.jpg'
 
@@ -116,19 +97,16 @@ def process_image(image_bytes: bytes, filename: str, preset: dict = None) -> byt
         timeout=60,
     ).content
 
-    # Открываем результат
     try:
         result_img = Image.open(io.BytesIO(result_bytes)).convert('RGB')
     except Exception:
         return result_bytes
 
-    # Проверяем размер — если API вернул меньше, ресайзим обратно
+    # Если API вернул меньший размер — ресайзим обратно
     if result_img.size != original_size:
         result_img = result_img.resize(original_size, Image.LANCZOS)
 
-    # Мягкий sharpening — возвращает резкость после обработки API
-    result_img = _apply_sharpening(result_img)
-
+    # Никакой постобработки — возвращаем как есть
     return _save_jpeg(result_img, quality=100)
 
 
