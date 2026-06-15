@@ -2596,8 +2596,8 @@ async def confirm_update_broadcast(callback: CallbackQuery, state: FSMContext):
     sent = 0
     failed = 0
 
-    # Пути к фото до/после на сервере
     import os as _os
+    from aiogram.types import FSInputFile, InputMediaPhoto
     BASE_DIR = _os.path.dirname(_os.path.abspath(__file__))
     before_path = _os.path.join(BASE_DIR, "update_before.png")
     after_path  = _os.path.join(BASE_DIR, "update_after.png")
@@ -2605,12 +2605,14 @@ async def confirm_update_broadcast(callback: CallbackQuery, state: FSMContext):
 
     await callback.message.edit_text(f"📢 Отправляю обновление {total} пользователям...")
 
-    from aiogram.types import FSInputFile, InputMediaPhoto
-    for uid in users:
+    # Загружаем фото один раз — получаем file_id для переиспользования
+    before_file_id = None
+    after_file_id = None
+    if has_photos:
         try:
-            if has_photos:
-                # Отправляем альбом из двух фото с подписями
-                media = [
+            sent_preview = await bot.send_media_group(
+                callback.from_user.id,
+                media=[
                     InputMediaPhoto(
                         media=FSInputFile(before_path),
                         caption="📸 <b>Было</b> — раньше фото теряло контраст и сочность",
@@ -2622,10 +2624,32 @@ async def confirm_update_broadcast(callback: CallbackQuery, state: FSMContext):
                         parse_mode="HTML",
                     ),
                 ]
-                await bot.send_media_group(uid, media=media)
+            )
+            before_file_id = sent_preview[0].photo[-1].file_id
+            after_file_id  = sent_preview[1].photo[-1].file_id
+        except Exception as e:
+            has_photos = False
+
+    for uid in users:
+        try:
+            if has_photos and before_file_id and after_file_id:
+                await bot.send_media_group(
+                    uid,
+                    media=[
+                        InputMediaPhoto(
+                            media=before_file_id,
+                            caption="📸 <b>Было</b> — раньше фото теряло контраст и сочность",
+                            parse_mode="HTML",
+                        ),
+                        InputMediaPhoto(
+                            media=after_file_id,
+                            caption="✨ <b>Стало</b> — теперь фото сохраняет живой цвет и текстуру",
+                            parse_mode="HTML",
+                        ),
+                    ]
+                )
                 await asyncio.sleep(0.1)
 
-            # Потом текст с обновлением
             await bot.send_message(uid, UPDATE_TEXT, parse_mode="HTML")
             sent += 1
             await asyncio.sleep(0.05)
@@ -2638,7 +2662,6 @@ async def confirm_update_broadcast(callback: CallbackQuery, state: FSMContext):
         f"Ошибок: {failed}"
     )
     await callback.answer()
-
 
 
 @dp.callback_query(lambda c: c.data == "cancel_update_broadcast")
