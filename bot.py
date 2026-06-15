@@ -2533,7 +2533,7 @@ async def cmd_broadcast_update(message: Message, state: FSMContext):
         "▸ результат выглядит как профессиональная обработка, а не фильтр\n\n"
         "Раньше фото после обработки становилось плоским и холодным. "
         "Теперь — живым, тёплым и естественным. Разница очевидна с первого взгляда.\n\n"
-        "Отправьте любое фото прямо сейчас и убедитесь сами 📸"
+        "Отправь любое фото и попробуй прямо сейчас 📸"
     )
 
     users = await get_all_users()
@@ -2630,7 +2630,8 @@ async def confirm_update_broadcast(callback: CallbackQuery, state: FSMContext):
         except Exception as e:
             has_photos = False
 
-    for uid in users:
+    for user in users:
+        uid = user["telegram_id"] if isinstance(user, dict) else user
         try:
             if has_photos and before_file_id and after_file_id:
                 await bot.send_media_group(
